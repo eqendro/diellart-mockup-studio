@@ -1,98 +1,60 @@
 # DiellArt Mockup Studio
 
-> Visualize your brand before you print.
+> Visualise your brand before you print.
 
-DiellArt Mockup Studio is a web application that enables prospective customers to upload their company logo and instantly preview how it will appear on DiellArt's customizable products.
+DiellArt Mockup Studio is the foundation for a product-personalisation experience where prospective customers will be able to upload a logo and preview it on personalised DiellArt paper products. Pocket Paper is the first planned product.
 
-The first supported product is **Pocket Paper**, with future support planned for napkins, paper cups, bags, boxes, medical paper rolls, and other printable products.
+## Current MVP scope
 
----
+This milestone provides the production-ready project structure and a responsive placeholder homepage. Logo upload, image processing, mockup rendering, accounts, databases, APIs, and server-side storage are intentionally not implemented yet.
 
-## Vision
+The interface now includes a small design-system foundation with central CSS tokens and reusable primitives for buttons, badges, cards, layout, section headings, placeholders, and the visual-only future upload area. See [`docs/design/Design_System.md`](docs/design/Design_System.md).
 
-Instead of asking customers to imagine how their logo will look, allow them to experience it instantly through realistic, high-quality mockups.
+## Technology stack
 
-The long-term goal is to build a scalable Product Personalization Platform that supports all customizable DiellArt products.
+- Next.js 16 App Router
+- React 19
+- TypeScript (strict mode)
+- Tailwind CSS 4
+- ESLint
+- npm
 
----
+## Local development
 
-## Current Scope (Version 1)
+Requirements: Node.js 20.9 or newer and npm.
 
-- Upload a company logo
-- Automatic logo fitting
-- Automatic monochrome conversion
-- Three realistic Pocket Paper mockups
-- Live logo positioning adjustments
-- Responsive interface
-- Browser-based rendering
-- No account required
+```bash
+npm install
+npm run dev
+```
 
----
+Open [http://localhost:3000](http://localhost:3000).
 
-## Planned Features
+## Production build
 
-- Additional customizable products
-- Customer accounts
-- Saved projects
-- PDF export
-- Quote requests
-- CRM integration
-- AI-generated industry scenes
-- Multi-colour printing
-- Admin dashboard
+```bash
+npm run lint
+npm run build
+npm start
+```
 
----
+No environment variables are required for this milestone.
 
-## Technology Stack
+## Repository structure
 
-### Frontend
+```text
+assets/             Source product, mockup, logo, and reference assets
+docs/               Business, architecture, product, and development notes
+public/             Web-ready brand, mockup, and icon assets
+src/app/            App Router entry points and global styles
+src/components/     Shared layout and UI components
+src/features/       Feature boundaries for future product capabilities
+src/config/         Application configuration
+src/lib/            Shared framework-independent utilities
+src/shared/         Small reusable constants, hooks, and utility functions
+src/styles/         Reserved shared style resources
+src/types/          Shared TypeScript types
+tests/              Unit and integration test locations
+```
 
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-
-### Image Processing
-
-- HTML Canvas
-- Browser-based rendering
-
-### Deployment
-
-- GitHub
-- Vercel
-
----
-
-## Project Structure
-
-See the `/docs` folder for complete documentation.
-
-Documentation includes:
-
-- Project Vision
-- Software Requirements Specification
-- System Architecture
-- UI Guidelines
-- Product Specifications
-- Development Roadmap
-- Decision Log
-
----
-
-## Development Philosophy
-
-This project is developed incrementally.
-
-Each milestone must:
-
-- produce a working application
-- be deployable
-- maintain modular architecture
-- remain extensible for future products
-
----
-
-## License
-
-To be determined.
+Image-processing and mockup-rendering features are not yet implemented.
