@@ -8,6 +8,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  loadingLabel?: string;
 };
 
 const variants: Record<ButtonVariant, string> = {
@@ -27,6 +28,7 @@ export function Button({
   variant = "primary",
   size = "medium",
   loading = false,
+  loadingLabel = "Loading",
   disabled,
   className = "",
   ...props
@@ -43,7 +45,7 @@ export function Button({
       {loading ? (
         <>
           <span className="button-spinner" aria-hidden="true" />
-          <span>Loading</span>
+          <span>{loadingLabel}</span>
         </>
       ) : (
         children
@@ -51,4 +53,3 @@ export function Button({
     </button>
   );
 }
-

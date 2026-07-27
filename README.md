@@ -6,7 +6,7 @@ DiellArt Mockup Studio is the foundation for a product-personalisation experienc
 
 ## Current MVP scope
 
-This milestone provides the production-ready project structure and a responsive placeholder homepage. Logo upload, image processing, mockup rendering, accounts, databases, APIs, and server-side storage are intentionally not implemented yet.
+The application now supports browser-local logo selection, validation, preview, replacement, and removal. No file is uploaded or persisted. Image processing, mockup rendering, accounts, databases, APIs, and server-side storage are intentionally not implemented yet.
 
 The interface now includes a small design-system foundation with central CSS tokens and reusable primitives for buttons, badges, cards, layout, section headings, placeholders, and the visual-only future upload area. See [`docs/design/Design_System.md`](docs/design/Design_System.md).
 
@@ -57,4 +57,4 @@ src/types/          Shared TypeScript types
 tests/              Unit and integration test locations
 ```
 
-Image-processing and mockup-rendering features are not yet implemented.
+Image-processing and mockup-rendering features are not yet implemented. See [`docs/features/Logo_Upload.md`](docs/features/Logo_Upload.md) for the current selection and preview workflow.

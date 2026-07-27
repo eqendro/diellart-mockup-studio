@@ -1,12 +1,11 @@
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { PreviewCard } from "@/components/ui/PreviewCard";
 import { Section } from "@/components/ui/Section";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { UploadDropzonePreview } from "@/components/ui/UploadDropzonePreview";
+import { LogoUpload } from "@/features/upload/components/LogoUpload";
 
 const previews = [
   {
@@ -44,29 +43,30 @@ export default function Home() {
               Soon, you&apos;ll be able to upload your logo and preview it on
               personalised DiellArt products before moving to production.
             </p>
-            <Button
-              type="button"
-              size="large"
-              disabled
-              aria-describedby="hero-upload-status"
+            <a
+              href="#logo-upload"
+              className="button button-primary button-large hero-cta"
             >
               Upload Logo
-            </Button>
-            <p id="hero-upload-status" className="text-supporting">
-              Uploads will be available in a future release.
+            </a>
+            <p className="text-supporting">
+              Your file stays private in this browser.
             </p>
           </Container>
         </Section>
 
-        <Container className="upload-preview-wrap">
-          <UploadDropzonePreview />
-        </Container>
+        <Section spacing="compact" labelledBy="logo-upload-heading" className="upload-section">
+          <Container>
+            <LogoUpload />
+          </Container>
+        </Section>
 
         <Section labelledBy="preview-heading" className="preview-section">
           <Container>
             <SectionHeader
               eyebrow="Three perspectives"
               heading="Your product, thoughtfully presented."
+              description="Mockup generation is not active yet. These views will use your selected logo in a future stage."
               headingId="preview-heading"
             />
             <div className="preview-grid">
@@ -81,4 +81,3 @@ export default function Home() {
     </div>
   );
 }
-
