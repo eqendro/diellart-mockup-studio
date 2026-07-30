@@ -1,79 +1,73 @@
 # Changelog
 
+All notable changes to this project are documented here in reverse
+chronological order.
+
 ## Unreleased
 
-- Added conservative post-monochrome residual-noise cleanup with
-  subtractive-only alpha changes, protected component analysis, diagnostics,
-  and safe fallback.
-- Fixed post-upload idle and uncertain review phases incorrectly entering
-  ErrorRecoverable.
-- Added classification-aware usable-candidate checks and a transparent-logo
-  fast path around opaque-background validation.
-- Changed failed automatic plain-background preparation to assisted selection.
-- Added development-only orchestration routing diagnostics and real-fixture
-  regressions for DiellArt, Xh’Aura, and EC Analytics.
-- Added a six-state customer artwork adapter over the existing intake and
-  preparation internals.
-- Removed customer-facing artwork-version, confidence, metadata, and review
-  decisions from the normal journey.
-- Made crop mode a full-width focused task and reduced recovery to selecting
-  again or choosing another image.
-- Reduced PreviewReady controls to placement, reset, replace, remove, and
-  browser-memory approval with Edit placement.
-- Added customer-state regression coverage, including protection against
-  rendering failed photographs.
-- Fixed crop confirmation so the cropped File, Blob URL, and natural-image
-  rectangle persist in workflow state before preparation.
-- Added display-to-natural coordinate mapping with letterbox offsets and source
-  boundary clamping.
-- Added explicit selecting, cropping, preparing, ready, review, and failed
-  states, plus proof-area “Select your logo” recovery.
-- Preserved Cropped and Original candidates when post-crop preparation fails.
-- Added a development invariant for checkerboard/renderer URL parity and an
-  Xh’Aura cropped-preparation regression.
-- Connected intake classifications to automatic preparation, guided crop,
-  candidate review, and recovery.
-- Added responsive touch and keyboard cropping using `react-image-crop`.
-- Added non-destructive original/cropped/prepared URL ownership and cleanup.
-- Added Original/Prepared review actions and a camera-enabled mobile input.
-- Added workflow routing, candidate-confidence, and crop-coordinate tests.
-- Added Artwork Intake Engine Version 1 with deterministic classification,
-  confidence, reasons, warnings, and workflow recommendations.
-- Added pre-preparation analysis messaging and crop-required guidance without
-  implementing a crop tool.
-- Added classification coverage for transparent logos, plain-background
-  artwork, photographs, screenshots, documents, and unknown images.
-- Added explicit post-removal foreground bounds, alpha-threshold cropping, and
-  equal padding capped between 6px and 20px.
-- Added foreground-only validation with at most one cleanup pass and
-  development-only preparation diagnostics.
-- Updated renderer geometry to fit measured foreground bounds instead of the
-  padded prepared canvas.
-- Added real-fixture coverage for Xh’Aura, EC Analytics, and DiellArt artwork.
-- Replaced customer-facing size and position percentages with semantic
-  Smaller/Recommended/Larger sizing and accessible directional controls.
-- Set the balanced default to 88% of the orientation-aware safe maximum.
-- Switched border estimation from one global mean to eight border segments and
-  added one-pass residual light-field validation.
-- Reduced neutral halo alpha from 150 to 24 and limited feathering to the local
-  boundary.
-- Made the checkerboard artwork preview show the selected prepared or original
-  asset instead of always showing the original.
-- Removed the duplicate hero upload button, updated the working-product copy,
-  and reduced upload-panel and proof-stage whitespace.
-- Added accessible size and position sliders with geometry-derived safe limits
-  and a centred reset action.
-- Strengthened light-background classification with adaptive border tolerance,
-  neutral halo cleanup, and boundary colour decontamination.
-- Added pale-artwork detection and a configuration-driven visibility fallback.
-- Renamed the proof heading to “Your Design Preview” and separated the product
-  label.
-- Reworked the post-upload experience into an immediate, responsive Digital
-  Proof workspace with a large Pocket Paper stage and compact artwork panel.
-- Added a non-destructive original/prepared/printable artwork lifecycle with
-  automatic object URL cleanup and an original-background override.
-- Added browser-side edge-connected near-white background removal, feathering,
-  transparent-margin cropping, and large-image analysis downsampling.
-- Added configuration-driven paper print simulation and orientation-aware
-  safe-area fitting.
-- Added Vitest coverage for pixel preparation and wide, tall, and square fits.
+## v0.9.0 — Artwork Engine Public Preview — 2026-07-30
+
+### Added
+
+- Added browser-local PNG, JPEG, WebP, and supported SVG artwork upload with
+  file validation and object-URL lifecycle management.
+- Added deterministic artwork intake and classification for transparent logos,
+  plain-background logos, photographs, screenshots, documents, and unknown
+  artwork.
+- Added transparent PNG handling and an unchanged preparation path for SVG
+  files, which are displayed through object URLs without parsing their markup.
+- Added an optional manual crop workflow for raster artwork, including
+  display-to-natural coordinate mapping, letterbox offsets, source-boundary
+  clamping, and persisted cropped candidates.
+- Added edge-connected near-white background removal for suitable raster
+  artwork, followed by transparent-margin cropping and bounded padding.
+- Added one-colour artwork conversion, dominant print-colour detection, and
+  detected, black, blue, and green colour choices.
+- Added original, cropped, prepared, printable, and monochrome artwork states
+  with independently managed browser-local URLs.
+- Added Pocket Paper safe-area fitting, drag positioning, semantic scale
+  controls, directional movement, centring, and reset.
+- Added touch dragging and pinch scaling with geometry-constrained placement.
+- Added a responsive Pocket Paper proof workspace with mobile-specific colour
+  controls and artwork interaction guidance.
+
+### Improved
+
+- Improved artwork topology preservation by restricting background removal to
+  eligible pixels connected to the image edge.
+- Improved preservation of letter counters, punctuation, apostrophes,
+  decorative rays, thin lines, and disconnected legitimate artwork elements.
+- Improved edge-contamination handling with adaptive border estimation,
+  alpha-preserving monochrome conversion, and conservative removal of only
+  conclusively isolated residual components.
+- Improved centring and proportional fitting by measuring visible foreground
+  bounds independently from transparent canvas padding.
+- Improved renderer stability for wide, tall, square, invalid, and
+  zero-dimension inputs.
+- Improved mobile usability with a compact proof toolbar and direct
+  manipulation inside the preview.
+- Improved preparation fallback behaviour so originals and confirmed crops are
+  preserved when automatic preparation cannot produce a usable candidate.
+- Improved separation between upload and intake, artwork preparation,
+  monochrome processing, fit and placement logic, product configuration, and
+  rendering.
+
+### Fixed
+
+- Fixed incorrect crop-coordinate mapping caused by responsive display scaling
+  and letterboxing.
+- Fixed prepared-artwork workflow regressions where cropped files, object URLs,
+  or selected candidates were not retained through preparation.
+- Fixed transparent artwork incorrectly entering recoverable failure states.
+- Fixed logo distortion and missing components caused by inconsistent canvas
+  and foreground geometry.
+- Fixed filled letter counters and lost internal negative spaces during
+  preparation and monochrome conversion.
+- Fixed preservation regressions affecting apostrophes, decorative details,
+  thin marks, and disconnected artwork elements.
+- Fixed incorrect placement caused by treating transparent padding as visible
+  artwork.
+- Fixed removable light-background remnants for supported plain-background
+  artwork without claiming general-purpose photographic extraction.
+- Fixed state transitions that could block accepted artwork in idle, uncertain
+  review, crop, or preparation phases.

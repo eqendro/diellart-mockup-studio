@@ -2,7 +2,9 @@
 
 ## Purpose
 
-The logo upload module lets a visitor select, validate, inspect, preview, replace, and remove one logo without sending it anywhere. It is the browser-local entry point for the future logo engine.
+The logo upload module lets a visitor select, validate, inspect, preview,
+replace, and remove one logo without sending it anywhere. It is the
+browser-local entry point to the Artwork Engine.
 
 ## Supported formats and size
 
@@ -20,7 +22,9 @@ The module rejects unsupported MIME types, unsupported extensions, files over 10
 
 If an initial selection fails, the alert is headed “Logo not accepted.” If a replacement fails while a valid logo is already selected, the previous selection and its object URL are retained. The alert is headed “Replacement logo not accepted” and explicitly confirms that the previous logo has been kept.
 
-Validation is a pure function in `utils/validate-logo-file.ts`, making the rules suitable for focused unit tests when a test runner is introduced. Recommended future cases include all supported types, MIME/extension mismatches, boundary sizes, empty files, multiple files, invalid image bytes, and missing extensions.
+Validation is a pure function in `utils/validate-logo-file.ts`. Unit coverage
+includes supported types, MIME/extension mismatches, boundary sizes, empty
+files, invalid image bytes, and missing extensions.
 
 ## Artwork lifecycle
 
@@ -81,15 +85,10 @@ Configuration is centralised in
 on the longest edge. Near-white channels must be at least 224; at least 88% of
 opaque border samples must be near-white and 82% must be within colour distance
 24 of the estimated background. Connected tolerance starts at 42, adapts to
-three times measured border variation, and is capped at 72. Edge-connected
-neutral pixels down to channel value 210 with chroma at most 28 are eligible.
-Border colour is estimated from eight border segments and combined with a
-median rather than one global average. Two local halo passes, alpha cap 24
-(previously 150), feather distance 12, one-pixel local radius, and boundary
-colour decontamination strength 0.45 suppress pale fringes without retaining a
-translucent field. Border-band validation uses confidence 0.68 and low-alpha
-threshold 48; at most one controlled maximum-tolerance cleanup is run.
-Cropping uses 3.5% padding subject to the bounds below.
+three times measured border variation, and is capped at 72. Border colour is
+estimated from eight border segments and combined with a median rather than
+one global average. Only eligible pixels connected to an image edge have their
+alpha changed. Cropping uses 3.5% padding subject to the bounds below.
 
 Foreground bounds are measured after removal from pixels whose alpha is above
 8. Cropping uses only those bounds, then applies equal 3.5% padding clamped
@@ -97,11 +96,8 @@ between 6px and 20px. The prepared asset retains both its padded canvas size
 and its exact visible bounds so downstream fitting does not treat padding as
 logo content.
 
-Post-crop validation flags an output when more than 70% is opaque, its
-foreground bounds cover more than 90% of the canvas, and luminance standard
-deviation is below 48. A flagged light-background result receives one cleanup
-pass only. Development builds log original/prepared sizes, bounds, coverage,
-transparency, padding, validation, and cleanup usage; production builds do not.
+Development builds log original/prepared sizes, bounds, coverage,
+transparency, padding, and validation; production builds do not.
 
 ## Known limitations
 
@@ -114,4 +110,7 @@ transparency, padding, validation, and cleanup usage; production builds do not.
 
 ## Relationship to the logo engine
 
-A future milestone may pass the accepted browser-local `File` to the logo engine for explicit client-side processing. That work must remain separate from selection and validation and must not silently introduce server upload or persistence.
+The accepted browser-local `File` passes to Artwork Intake and then, when
+appropriate, to the logo engine for client-side preparation. Selection and
+validation remain separate from pixel processing, and neither boundary
+introduces server upload or persistence.

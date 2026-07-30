@@ -1,4 +1,9 @@
 # Logo engine
 
-Reserved for future browser-based artwork preparation. No image-processing logic is implemented in this milestone.
+The logo engine implements browser-local raster preparation and one-colour
+artwork generation. It owns prepared artwork derivatives independently from
+the immutable upload and exposes `PrintableArtwork` to the personalisation and
+mock-up layers.
 
+See [`docs/ArtworkEngine.md`](../../../docs/ArtworkEngine.md) for the current
+pipeline and contracts.

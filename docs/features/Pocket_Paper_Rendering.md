@@ -90,7 +90,7 @@ foreground—not its invisible canvas—occupies the resolved safe-area fit.
 The renderer consumes a surface `renderingProfile` and has no product-name or
 upload-control knowledge. White Pocket Paper uses matte paper with `multiply`,
 opacity `0.92`, contrast and saturation `0.96`, and lightweight ink diffusion.
-Boundary decontamination reduces white matting. Very light artwork is detected
+Very light artwork is detected
 during preparation and switches to `normal` blending, minimum opacity `0.98`,
 and contrast `1.08` so it remains visible on white paper. Texture influence is
 deliberately subtle and adds no shadow, bevel, or sticker edge. The same

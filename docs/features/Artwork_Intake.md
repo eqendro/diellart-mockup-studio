@@ -35,9 +35,9 @@ plain backgrounds. Unknown input receives low confidence.
 | Document | CropRequired, then background preparation |
 | Unknown | ManualReview |
 
-The existing preparation may still perform non-destructive transparent-margin
-cropping for transparent logos. `CropRequired` opens the guided crop workflow
-and preserves the original.
+Transparent logos use their existing transparency without raster background
+removal. `CropRequired` opens the guided crop workflow and preserves the
+original.
 
 ## Guided crop and recovery
 
@@ -53,10 +53,10 @@ Cancelling never replaces the original.
 
 ## Preparation outcomes
 
-High-confidence candidates become ready immediately. Medium-confidence
-candidates remain selected by default but enter review with Original and
-Prepared checkerboard previews. Customers can use the prepared candidate,
-adjust the selection, or restore the original.
+High-confidence candidates become ready immediately. Medium-confidence usable
+candidates are selected internally and map to the same customer-facing
+PreviewReady state. Candidate confidence and original/prepared switching are
+not exposed in the normal customer journey.
 
 The lifecycle is:
 
@@ -67,9 +67,9 @@ when replaced or unmounted.
 
 The cropped asset is committed to workflow state before background preparation
 starts. It therefore persists when the crop workspace closes. Successful
-preparation replaces the printable candidate with the prepared URL; failed
-preparation keeps both Cropped and Original choices and offers another
-selection attempt.
+preparation replaces the printable candidate with the prepared URL. Failed
+preparation preserves the cropped and original assets internally and offers
+another selection attempt or file replacement.
 
 Crop confirmation records the displayed crop and displayed image rectangle.
 The mapping utility subtracts any displayed-image offset (including
