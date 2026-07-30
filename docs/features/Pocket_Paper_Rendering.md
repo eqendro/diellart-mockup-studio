@@ -6,6 +6,26 @@ The Product View is the browser-rendered Pocket Paper Digital Proof. It
 composes prepared browser-local artwork over a transparent static mockup
 without uploading the artwork.
 
+## Residual-noise cleanup
+
+After monochrome conversion, the live browser pipeline runs a conservative
+residual-noise cleanup before PNG encoding. It uses iterative 8-neighbour
+connected-component analysis and may only set the alpha of a conclusively
+isolated tiny component to zero. It never changes canvas dimensions, retained
+RGBA bytes, placement, or renderer geometry.
+
+Thresholds live in
+`src/features/logo-engine/preparation/residual-noise-config.ts`. Major,
+meaningful, nearby, repeated, aligned, oversized, and ambiguous components are
+protected, including punctuation, letter dots, rays, rules, fine text,
+disconnected symbols, and transparent counters. Disabled, empty,
+single-component, invalid, ambiguous, or failed analysis returns an unchanged
+copy, so cleanup cannot block preview generation.
+
+Development builds report diagnostics only when a component is removed,
+including geometry, area ratios, protected distance, and the removal reason.
+Ambiguous specks are intentionally retained.
+
 ## Product and printable surface
 
 - Product size: 100 mm × 200 mm.

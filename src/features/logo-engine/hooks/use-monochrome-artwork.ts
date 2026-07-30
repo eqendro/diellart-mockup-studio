@@ -12,6 +12,7 @@ import {
   type RasterPixels,
 } from "@/features/logo-engine/monochrome/pixels";
 import type { PrintableArtwork } from "@/features/logo-engine/types/artwork";
+import { cleanupResidualNoise } from "@/features/logo-engine/preparation/residual-noise-cleanup";
 
 type MonochromeSource = {
   artworkUrl: string;
@@ -43,13 +44,18 @@ async function decodeArtwork(url: string): Promise<RasterPixels> {
 
 async function createMonochromeBlob(pixels: RasterPixels, colour: string) {
   const monochrome = createMonochromePixels(pixels, colour);
+  const cleanup = cleanupResidualNoise(monochrome);
+  const cleaned = cleanup.image;
+  if (process.env.NODE_ENV !== "production" && cleanup.changed) {
+    console.debug("[artwork-residual-noise]", cleanup.diagnostics);
+  }
   const canvas = document.createElement("canvas");
-  canvas.width = monochrome.width;
-  canvas.height = monochrome.height;
+  canvas.width = cleaned.width;
+  canvas.height = cleaned.height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Monochrome canvas is unavailable.");
-  const output = new ImageData(monochrome.width, monochrome.height);
-  output.data.set(monochrome.data);
+  const output = new ImageData(cleaned.width, cleaned.height);
+  output.data.set(cleaned.data);
   context.putImageData(output, 0, 0);
   return new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(

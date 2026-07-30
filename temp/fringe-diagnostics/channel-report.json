@@ -1,0 +1,131 @@
+{
+  "diellart": {
+    "original": {
+      "width": 1600,
+      "height": 1426,
+      "alpha": 234935,
+      "partialAlpha": 40071,
+      "greyPartial": 6184,
+      "colours": 4600
+    },
+    "backgroundRemoved": {
+      "width": 1600,
+      "height": 1426,
+      "alpha": 234935,
+      "partialAlpha": 40071,
+      "greyPartial": 6184,
+      "colours": 4600
+    },
+    "cropped": {
+      "width": 1404,
+      "height": 907,
+      "alpha": 234935,
+      "partialAlpha": 40071,
+      "greyPartial": 6184,
+      "colours": 4600
+    },
+    "monochrome": {
+      "width": 1404,
+      "height": 907,
+      "alpha": 234935,
+      "partialAlpha": 40071,
+      "greyPartial": 5941,
+      "colours": 209
+    },
+    "cleaned": {
+      "width": 1404,
+      "height": 907,
+      "alpha": 234935,
+      "partialAlpha": 40071,
+      "greyPartial": 5941,
+      "colours": 209
+    },
+    "removed": 0
+  },
+  "ec-analytics": {
+    "original": {
+      "width": 206,
+      "height": 62,
+      "alpha": 12772,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 1004
+    },
+    "backgroundRemoved": {
+      "width": 206,
+      "height": 62,
+      "alpha": 3563,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 919
+    },
+    "cropped": {
+      "width": 203,
+      "height": 51,
+      "alpha": 3563,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 919
+    },
+    "monochrome": {
+      "width": 203,
+      "height": 51,
+      "alpha": 3563,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 20
+    },
+    "cleaned": {
+      "width": 203,
+      "height": 51,
+      "alpha": 3563,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 20
+    },
+    "removed": 0
+  },
+  "xh-aura": {
+    "original": {
+      "width": 1024,
+      "height": 1536,
+      "alpha": 1572864,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 256
+    },
+    "backgroundRemoved": {
+      "width": 1024,
+      "height": 1536,
+      "alpha": 42100,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 256
+    },
+    "cropped": {
+      "width": 578,
+      "height": 581,
+      "alpha": 42100,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 256
+    },
+    "monochrome": {
+      "width": 578,
+      "height": 581,
+      "alpha": 42100,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 15
+    },
+    "cleaned": {
+      "width": 578,
+      "height": 581,
+      "alpha": 42100,
+      "partialAlpha": 0,
+      "greyPartial": 0,
+      "colours": 15
+    },
+    "removed": 0
+  }
+}

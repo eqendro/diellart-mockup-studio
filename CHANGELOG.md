@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added conservative post-monochrome residual-noise cleanup with
+  subtractive-only alpha changes, protected component analysis, diagnostics,
+  and safe fallback.
 - Fixed post-upload idle and uncertain review phases incorrectly entering
   ErrorRecoverable.
 - Added classification-aware usable-candidate checks and a transparent-logo
