@@ -1,0 +1,15 @@
+export const ARTWORK_INTAKE_CONFIG = {
+  analysisMaxDimension: 640,
+  transparentLogoRatio: 0.02,
+  plainBorderUniformity: 0.82,
+  plainBorderLightness: 0.82,
+  photographColourBucketRatio: 0.16,
+  photographLuminanceVariance: 0.035,
+  photographEdgeComplexity: 0.18,
+  screenshotColourBucketRatio: 0.06,
+  screenshotEdgeComplexity: 0.035,
+  documentBorderUniformity: 0.78,
+  documentMinimumEdgeComplexity: 0.025,
+  documentMaximumEdgeComplexity: 0.16,
+  slideAspectTolerance: 0.09,
+} as const;

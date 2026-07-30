@@ -1,0 +1,48 @@
+ M README.md
+ M docs/architecture/System_Architecture.md
+ M docs/features/Logo_Upload.md
+ M docs/products/Pocket_Paper.md
+ M package-lock.json
+ M package.json
+ M src/app/globals.css
+ M src/app/page.tsx
+ M src/features/upload/components/LogoUpload.tsx
+?? CHANGELOG.md
+?? docs/development/Codex_Task_004.md
+?? docs/features/Artwork_Intake.md
+?? docs/features/Pocket_Paper_Rendering.md
+?? playwright.config.ts
+?? public/mockups/pocket-paper/
+?? src/config/products/pocket-paper.ts
+?? src/features/artwork-intake/
+?? src/features/logo-engine/components/
+?? src/features/logo-engine/hooks/
+?? src/features/logo-engine/index.ts
+?? src/features/logo-engine/monochrome/
+?? src/features/logo-engine/preparation/
+?? src/features/logo-engine/types/
+?? src/features/mockup-engine/components/
+?? src/features/mockup-engine/fit/
+?? src/features/mockup-engine/index.ts
+?? src/features/mockup-engine/placement/
+?? src/features/mockup-engine/utils/
+?? src/features/personalisation/
+?? src/types/product-template.ts
+?? temp/
+?? test-results/
+?? tests/assets/
+?? tests/e2e/
+?? tests/unit/artwork-intake.test.ts
+?? tests/unit/artwork-lifecycle.test.ts
+?? tests/unit/artwork-preparation.test.ts
+?? tests/unit/artwork-workflow.test.ts
+?? tests/unit/customer-artwork-state.test.ts
+?? tests/unit/fit-engine-architecture.test.ts
+?? tests/unit/foreground-geometry.test.ts
+?? tests/unit/logo-fit.test.ts
+?? tests/unit/logo-fixtures.test.ts
+?? tests/unit/monochrome-artwork.test.ts
+?? tests/unit/placement-gestures.test.ts
+?? tests/unit/placement.test.ts
+?? tests/unit/resolved-artwork-geometry.test.ts
+?? vitest.config.ts

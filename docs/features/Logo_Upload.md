@@ -22,6 +22,32 @@ If an initial selection fails, the alert is headed “Logo not accepted.” If a
 
 Validation is a pure function in `utils/validate-logo-file.ts`, making the rules suitable for focused unit tests when a test runner is introduced. Recommended future cases include all supported types, MIME/extension mismatches, boundary sizes, empty files, multiple files, invalid image bytes, and missing extensions.
 
+## Artwork lifecycle
+
+The accepted `File` and original object URL remain immutable. The logo engine
+creates a separate prepared PNG URL and exposes a printable-artwork view to the
+renderer. Raster preparation removes only near-white pixels connected to an
+edge, feathers the transition, and crops transparent margins with retained
+padding. Transparent input remains transparent; non-uniform or coloured borders
+remain unchanged. SVG is never parsed or injected and currently bypasses pixel
+preparation.
+
+The workflow can switch between cached original and prepared URLs internally
+without reprocessing, but the standard customer interface selects the best
+usable candidate automatically. Artwork changes reset placement to the
+recommended centred fit. Preparation errors preserve the original and offer
+guided crop recovery without exposing version-management controls.
+
+Crop-required intake results create a separate browser-local cropped PNG only
+after confirmation. That file passes through the same preparation pipeline;
+there is no duplicate background remover. Medium-confidence results retain both
+candidates internally while selecting the usable result automatically.
+Retrying or replacing a crop revokes the previous cropped and prepared URLs.
+
+The large proof area presents the single “Select logo area” recovery action.
+After confirmation, the selected internal asset and renderer consume the same
+printable URL; development builds assert this invariant.
+
 ## State model
 
 - `idle`: ready for selection
@@ -38,7 +64,7 @@ The original `File` exists only in component memory. There is no form submission
 
 ## Object URL lifecycle
 
-Accepted files are previewed with `URL.createObjectURL`. A candidate URL is revoked immediately if decoding fails. The previous accepted URL is revoked when a replacement succeeds, when the logo is removed, and when the component unmounts. The input value is reset after every selection so the same file can be chosen again.
+Accepted files are previewed with `URL.createObjectURL`. A candidate URL is revoked immediately if decoding fails. The previous accepted URL is revoked when a replacement succeeds, when the logo is removed, and when the component unmounts. Generated prepared URLs are independently revoked when replaced, removed, or unmounted. The input value is reset after every selection so the same file can be chosen again.
 
 ## SVG security
 
@@ -48,12 +74,42 @@ SVG text is never parsed or injected into the DOM. The application does not use 
 
 The accepted model exposes the original `File`, filename, MIME type, extension, byte size, formatted size, natural width, natural height, aspect ratio, and preview object URL. Raster images require readable natural dimensions. SVG intrinsic dimensions are shown when browser decoding provides them; otherwise they display as “Not specified.”
 
+## Preparation thresholds
+
+Configuration is centralised in
+`src/features/logo-engine/preparation/config.ts`. Analysis uses at most 1600 px
+on the longest edge. Near-white channels must be at least 224; at least 88% of
+opaque border samples must be near-white and 82% must be within colour distance
+24 of the estimated background. Connected tolerance starts at 42, adapts to
+three times measured border variation, and is capped at 72. Edge-connected
+neutral pixels down to channel value 210 with chroma at most 28 are eligible.
+Border colour is estimated from eight border segments and combined with a
+median rather than one global average. Two local halo passes, alpha cap 24
+(previously 150), feather distance 12, one-pixel local radius, and boundary
+colour decontamination strength 0.45 suppress pale fringes without retaining a
+translucent field. Border-band validation uses confidence 0.68 and low-alpha
+threshold 48; at most one controlled maximum-tolerance cleanup is run.
+Cropping uses 3.5% padding subject to the bounds below.
+
+Foreground bounds are measured after removal from pixels whose alpha is above
+8. Cropping uses only those bounds, then applies equal 3.5% padding clamped
+between 6px and 20px. The prepared asset retains both its padded canvas size
+and its exact visible bounds so downstream fitting does not treat padding as
+logo content.
+
+Post-crop validation flags an output when more than 70% is opaque, its
+foreground bounds cover more than 90% of the canvas, and luminance standard
+deviation is below 48. A flagged light-background result receives one cleanup
+pass only. Development builds log original/prepared sizes, bounds, coverage,
+transparency, padding, validation, and cleanup usage; production builds do not.
+
 ## Known limitations
 
-- No pixel transformation, sanitisation, colour analysis, or print-readiness assessment occurs.
+- Complex shadows, gradients, hair, and photographic background extraction are
+  outside the deterministic white-background algorithm's scope.
+- SVG receives no raster background removal or cropping.
 - Browser MIME reporting is required and may vary for unusually generated files.
 - SVG intrinsic dimensions depend on information the browser can derive.
-- The current project has no automated test runner; validation remains pure for later coverage.
 - The module does not persist a selection across navigation or refresh.
 
 ## Relationship to the logo engine

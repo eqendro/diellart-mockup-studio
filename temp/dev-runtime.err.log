@@ -1,0 +1,193 @@
+[browser] [artwork-preparation-contract] {
+  bounds: { height: [1mnull[22m, width: [1mnull[22m, x: [90mundefined[39m, y: [90mundefined[39m },
+  cropPaddingRatio: [33m0.035[39m,
+  maximumCropPaddingPx: [33m20[39m,
+  minimumCropPaddingPx: [33m6[39m
+} 
+    at cropTransparentMargins (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1282:17)
+    at prepareArtworkPixels (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1378:19)
+    at prepareArtwork (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1477:223)
+    at async usePreparedArtwork.useCallback[applyPreparation] (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1619:28)
+    at async usePreparedArtwork.useEffect (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1748:25) (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1282:17)
+[browser] [artwork-preparation-contract] {"bounds":{"width":null,"height":null},"cropPaddingRatio":0.035,"minimumCropPaddingPx":6,"maximumCropPaddingPx":20} 
+    at cropTransparentMargins (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1282:17)
+    at prepareArtworkPixels (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1378:19)
+    at prepareArtwork (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1477:223)
+    at async usePreparedArtwork.useCallback[applyPreparation] (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1619:28)
+    at async usePreparedArtwork.useEffect (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1748:25) (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/src_0mafqia._.js:1282:17)
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head headCacheNode={{rsc:{...}, ...}}>
+                    <__next_viewport_boundary__>
+                    <MetadataWrapper>
+                      <div
+                        hidden={true}
+-                       bis_skin_checked="1"
+                      >
+                    ...
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.tsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <script>
+                      <RootLayout>
+                        <html lang="en">
+                          <body
+                            className="manrope_b7d5735e-module__suUhcW__variable"
+-                           __processed_a159c248-695b-42b9-9dc4-c93790ffbe54__="true"
+-                           bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWll..."
+                          >
+                            ...
+                              <SegmentViewNode type="page" pagePath="page.tsx">
+                                <SegmentTrieNode>
+                                <Home>
+                                  <div
+                                    className="site-shell"
+-                                   bis_skin_checked="1"
+                                  >
+                                    <Header>
+                                      <header className="site-header">
+                                        <Container>
+                                          <div
+                                            className="container  site-header-inner"
+-                                           bis_skin_checked="1"
+                                          >
+                                    <main>
+                                      <Section>
+                                        <section className="section  hero">
+                                          <Container>
+                                            <div
+                                              className="container container-narrow hero-content"
+-                                             bis_skin_checked="1"
+                                            >
+                                      <Section>
+                                        <section aria-labelledby="logo-uploa..." className="section se...">
+                                          <PocketPaperPersonaliser>
+                                            <div
+                                              className="container personaliser-upload"
+-                                             bis_skin_checked="1"
+                                            >
+                                              <LogoUpload upload={{status:"idle", ...}}>
+                                                <Card id="logo-upload" padding="none" className="logo-upload">
+                                                  <article id="logo-upload" className="card   log...">
+                                                    <input>
+                                                    <input>
+                                                    <div
+                                                      role="button"
+                                                      tabIndex={0}
+                                                      aria-disabled={false}
+                                                      aria-describedby="upload-instructions"
+                                                      className={"upload-dropzone "}
+                                                      onClick={function openPicker}
+                                                      onKeyDown={function handleKeyDown}
+                                                      onDragEnter={function handleDragEnter}
+                                                      onDragOver={function onDragOver}
+                                                      onDragLeave={function handleDragLeave}
+                                                      onDrop={function handleDrop}
+-                                                     bis_skin_checked="1"
+                                                    >
+                                                      <div
+                                                        className="upload-icon"
+                                                        aria-hidden="true"
+-                                                       bis_skin_checked="1"
+                                                      >
+                                                      <div
+-                                                       bis_skin_checked="1"
+                                                      >
+                                                      <div
+                                                        className="upload-choice-actions"
+-                                                       bis_skin_checked="1"
+                                                      >
+                                            <div
+                                              className="container lifestyle-section"
+-                                             bis_skin_checked="1"
+                                            >
+                                              <header>
+                                              <div
+                                                className="preview-grid"
+-                                               bis_skin_checked="1"
+                                              >
+                                                <PreviewCard title="Product View" description="Upload a l..." ...>
+                                                  <Card padding="none" className="preview-card">
+                                                    <article className="card   pre...">
+                                                      <PlaceholderPanel label="Product View" variant="product">
+                                                        <div
+                                                          role="img"
+                                                          aria-label="Product View placeholder preview"
+                                                          className="placeholder-panel placeholder-product"
+-                                                         bis_skin_checked="1"
+                                                        >
+                                                      <div
+                                                        className="preview-card-content"
+-                                                       bis_skin_checked="1"
+                                                      >
+                                                <PreviewCard title="Main Dish ..." description="See your b..." ...>
+                                                  <Card padding="none" className="preview-card">
+                                                    <article className="card   pre...">
+                                                      <PlaceholderPanel label="Main Dish ..." variant="main">
+                                                        <div
+                                                          role="img"
+                                                          aria-label="Main Dish Setting placeholder preview"
+                                                          className="placeholder-panel placeholder-main"
+-                                                         bis_skin_checked="1"
+                                                        >
+                                                      <div
+                                                        className="preview-card-content"
+-                                                       bis_skin_checked="1"
+                                                      >
+                                                <PreviewCard title="Dessert Se..." description="Preview th..." ...>
+                                                  <Card padding="none" className="preview-card">
+                                                    <article className="card   pre...">
+                                                      <PlaceholderPanel label="Dessert Se..." variant="dessert">
+                                                        <div
+                                                          role="img"
+                                                          aria-label="Dessert Setting placeholder preview"
+                                                          className="placeholder-panel placeholder-dessert"
+-                                                         bis_skin_checked="1"
+                                                        >
+                                                      <div
+                                                        className="preview-card-content"
+-                                                       bis_skin_checked="1"
+                                                      >
+                                    <Footer>
+                                      <footer className="site-footer">
+                                        <Container>
+                                          <div
+                                            className="container  site-footer-inner"
+-                                           bis_skin_checked="1"
+                                          >
+                              ...
+                  ...
+ 
+    at <unknown> (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:3439:25)
+    at runWithFiberInDEV (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:74)
+    at emitPendingHydrationWarnings (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:3438:13)
+    at completeWork (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6885:102)
+    at runWithFiberInDEV (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:131)
+    at completeUnitOfWork (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9622:23)
+    at performUnitOfWork (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9557:28)
+    at workLoopConcurrentByScheduler (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9551:58)
+    at renderRootConcurrent (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9534:71)
+    at performWorkOnRoot (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64) (file://C:/Users/Admin/Downloads/98!ProjectsCodex/98010!-diellart-mockup-studio/diellart-mockup-studio/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:3439:25)

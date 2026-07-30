@@ -6,9 +6,21 @@ DiellArt Mockup Studio is the foundation for a product-personalisation experienc
 
 ## Current MVP scope
 
-The application now supports browser-local logo selection, validation, preview, replacement, and removal. No file is uploaded or persisted. Image processing, mockup rendering, accounts, databases, APIs, and server-side storage are intentionally not implemented yet.
+The application supports browser-local logo selection, validation, automatic
+artwork preparation, original/prepared switching, replacement, and removal,
+plus an immediate Pocket Paper Digital Proof. Edge-connected near-white
+backgrounds and empty transparent margins are removed locally. No file is
+uploaded or persisted.
+
+Before preparation, the Artwork Intake Engine classifies accepted files as
+transparent logos, plain-background logos, photographs, screenshots,
+documents, or unknown artwork and recommends the safest workflow.
 
 The interface now includes a small design-system foundation with central CSS tokens and reusable primitives for buttons, badges, cards, layout, section headings, placeholders, and the visual-only future upload area. See [`docs/design/Design_System.md`](docs/design/Design_System.md).
+
+The hero now leads directly into the single functional upload panel. After
+upload, the Digital Proof provides safe-area-constrained size and horizontal/
+vertical placement controls; there is no duplicate hero upload action.
 
 ## Technology stack
 
@@ -34,6 +46,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 npm run lint
+npm run typecheck
+npm test
 npm run build
 npm start
 ```
@@ -57,4 +71,7 @@ src/types/          Shared TypeScript types
 tests/              Unit and integration test locations
 ```
 
-Image-processing and mockup-rendering features are not yet implemented. See [`docs/features/Logo_Upload.md`](docs/features/Logo_Upload.md) for the current selection and preview workflow.
+See [`docs/features/Logo_Upload.md`](docs/features/Logo_Upload.md) for the
+selection workflow and
+[`docs/features/Pocket_Paper_Rendering.md`](docs/features/Pocket_Paper_Rendering.md)
+for the initial mockup renderer.

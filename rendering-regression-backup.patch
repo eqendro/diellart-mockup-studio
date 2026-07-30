@@ -1,0 +1,2338 @@
+diff --git a/README.md b/README.md
+index aef8fa8..fce2c75 100644
+--- a/README.md
++++ b/README.md
+@@ -6,10 +6,22 @@ DiellArt Mockup Studio is the foundation for a product-personalisation experienc
+ 
+ ## Current MVP scope
+ 
+-The application now supports browser-local logo selection, validation, preview, replacement, and removal. No file is uploaded or persisted. Image processing, mockup rendering, accounts, databases, APIs, and server-side storage are intentionally not implemented yet.
++The application supports browser-local logo selection, validation, automatic
++artwork preparation, original/prepared switching, replacement, and removal,
++plus an immediate Pocket Paper Digital Proof. Edge-connected near-white
++backgrounds and empty transparent margins are removed locally. No file is
++uploaded or persisted.
++
++Before preparation, the Artwork Intake Engine classifies accepted files as
++transparent logos, plain-background logos, photographs, screenshots,
++documents, or unknown artwork and recommends the safest workflow.
+ 
+ The interface now includes a small design-system foundation with central CSS tokens and reusable primitives for buttons, badges, cards, layout, section headings, placeholders, and the visual-only future upload area. See [`docs/design/Design_System.md`](docs/design/Design_System.md).
+ 
++The hero now leads directly into the single functional upload panel. After
++upload, the Digital Proof provides safe-area-constrained size and horizontal/
++vertical placement controls; there is no duplicate hero upload action.
++
+ ## Technology stack
+ 
+ - Next.js 16 App Router
+@@ -34,6 +46,8 @@ Open [http://localhost:3000](http://localhost:3000).
+ 
+ ```bash
+ npm run lint
++npm run typecheck
++npm test
+ npm run build
+ npm start
+ ```
+@@ -57,4 +71,7 @@ src/types/          Shared TypeScript types
+ tests/              Unit and integration test locations
+ ```
+ 
+-Image-processing and mockup-rendering features are not yet implemented. See [`docs/features/Logo_Upload.md`](docs/features/Logo_Upload.md) for the current selection and preview workflow.
++See [`docs/features/Logo_Upload.md`](docs/features/Logo_Upload.md) for the
++selection workflow and
++[`docs/features/Pocket_Paper_Rendering.md`](docs/features/Pocket_Paper_Rendering.md)
++for the initial mockup renderer.
+diff --git a/docs/architecture/System_Architecture.md b/docs/architecture/System_Architecture.md
+index ca00509..f85896a 100644
+--- a/docs/architecture/System_Architecture.md
++++ b/docs/architecture/System_Architecture.md
+@@ -2,5 +2,34 @@
+ 
+ **Draft — to be expanded.**
+ 
+-The initial application is a browser-based Next.js interface with no database, authentication, upload processing, or server-side storage. This document will evolve as those capabilities are designed.
++The application is a browser-based Next.js interface with no database,
++authentication, or server-side storage. Upload validation owns the immutable
++original file URL. The logo engine derives and owns a prepared URL through
++edge-connected background removal and cropping. The mockup engine receives only
++printable artwork plus product/surface configuration, keeping upload UI and
++product naming outside the renderer.
+ 
++The Artwork Intake Engine sits between accepted upload and preparation. It
++performs deterministic, downsampled pixel analysis and returns classification,
++confidence, reasons, warnings, and a recommended workflow without depending on
++the renderer or product configuration.
++
++Workflow state owns intake classification, crop-required/open state,
++normalised crop coordinates, cropped temporary artwork, preparation outcome,
++candidate selection, errors, and retry actions. It remains separate from
++placement and product geometry; the renderer still receives only selected
++printable artwork.
++
++A customer-state adapter sits above this workflow and collapses it to Empty,
++Analysing, SelectLogoArea, Preparing, PreviewReady, or ErrorRecoverable. UI
++components consume that adapter rather than exposing candidate confidence or
++original/cropped/prepared lifecycle states.
++
++Manual placement is its own geometry-driven state. The personalisation layer
++owns it, the placement utilities resolve scale-dependent safe limits, and the
++renderer receives only the final scale and offsets. Upload replacement and
++artwork-version changes reset this state predictably.
++
++Customer controls translate precise numeric placement into semantic size
++labels and directional steps. Exact scale and offsets remain available in
++state and are passed to the product-agnostic renderer.
+diff --git a/docs/features/Logo_Upload.md b/docs/features/Logo_Upload.md
+index a5dc284..c4a013b 100644
+--- a/docs/features/Logo_Upload.md
++++ b/docs/features/Logo_Upload.md
+@@ -22,6 +22,32 @@ If an initial selection fails, the alert is headed “Logo not accepted.” If a
+ 
+ Validation is a pure function in `utils/validate-logo-file.ts`, making the rules suitable for focused unit tests when a test runner is introduced. Recommended future cases include all supported types, MIME/extension mismatches, boundary sizes, empty files, multiple files, invalid image bytes, and missing extensions.
+ 
++## Artwork lifecycle
++
++The accepted `File` and original object URL remain immutable. The logo engine
++creates a separate prepared PNG URL and exposes a printable-artwork view to the
++renderer. Raster preparation removes only near-white pixels connected to an
++edge, feathers the transition, and crops transparent margins with retained
++padding. Transparent input remains transparent; non-uniform or coloured borders
++remain unchanged. SVG is never parsed or injected and currently bypasses pixel
++preparation.
++
++The workflow can switch between cached original and prepared URLs internally
++without reprocessing, but the standard customer interface selects the best
++usable candidate automatically. Artwork changes reset placement to the
++recommended centred fit. Preparation errors preserve the original and offer
++guided crop recovery without exposing version-management controls.
++
++Crop-required intake results create a separate browser-local cropped PNG only
++after confirmation. That file passes through the same preparation pipeline;
++there is no duplicate background remover. Medium-confidence results retain both
++candidates internally while selecting the usable result automatically.
++Retrying or replacing a crop revokes the previous cropped and prepared URLs.
++
++The large proof area presents the single “Select logo area” recovery action.
++After confirmation, the selected internal asset and renderer consume the same
++printable URL; development builds assert this invariant.
++
+ ## State model
+ 
+ - `idle`: ready for selection
+@@ -38,7 +64,7 @@ The original `File` exists only in component memory. There is no form submission
+ 
+ ## Object URL lifecycle
+ 
+-Accepted files are previewed with `URL.createObjectURL`. A candidate URL is revoked immediately if decoding fails. The previous accepted URL is revoked when a replacement succeeds, when the logo is removed, and when the component unmounts. The input value is reset after every selection so the same file can be chosen again.
++Accepted files are previewed with `URL.createObjectURL`. A candidate URL is revoked immediately if decoding fails. The previous accepted URL is revoked when a replacement succeeds, when the logo is removed, and when the component unmounts. Generated prepared URLs are independently revoked when replaced, removed, or unmounted. The input value is reset after every selection so the same file can be chosen again.
+ 
+ ## SVG security
+ 
+@@ -48,12 +74,42 @@ SVG text is never parsed or injected into the DOM. The application does not use
+ 
+ The accepted model exposes the original `File`, filename, MIME type, extension, byte size, formatted size, natural width, natural height, aspect ratio, and preview object URL. Raster images require readable natural dimensions. SVG intrinsic dimensions are shown when browser decoding provides them; otherwise they display as “Not specified.”
+ 
++## Preparation thresholds
++
++Configuration is centralised in
++`src/features/logo-engine/preparation/config.ts`. Analysis uses at most 1600 px
++on the longest edge. Near-white channels must be at least 224; at least 88% of
++opaque border samples must be near-white and 82% must be within colour distance
++24 of the estimated background. Connected tolerance starts at 42, adapts to
++three times measured border variation, and is capped at 72. Edge-connected
++neutral pixels down to channel value 210 with chroma at most 28 are eligible.
++Border colour is estimated from eight border segments and combined with a
++median rather than one global average. Two local halo passes, alpha cap 24
++(previously 150), feather distance 12, one-pixel local radius, and boundary
++colour decontamination strength 0.45 suppress pale fringes without retaining a
++translucent field. Border-band validation uses confidence 0.68 and low-alpha
++threshold 48; at most one controlled maximum-tolerance cleanup is run.
++Cropping uses 3.5% padding subject to the bounds below.
++
++Foreground bounds are measured after removal from pixels whose alpha is above
++8. Cropping uses only those bounds, then applies equal 3.5% padding clamped
++between 6px and 20px. The prepared asset retains both its padded canvas size
++and its exact visible bounds so downstream fitting does not treat padding as
++logo content.
++
++Post-crop validation flags an output when more than 70% is opaque, its
++foreground bounds cover more than 90% of the canvas, and luminance standard
++deviation is below 48. A flagged light-background result receives one cleanup
++pass only. Development builds log original/prepared sizes, bounds, coverage,
++transparency, padding, validation, and cleanup usage; production builds do not.
++
+ ## Known limitations
+ 
+-- No pixel transformation, sanitisation, colour analysis, or print-readiness assessment occurs.
++- Complex shadows, gradients, hair, and photographic background extraction are
++  outside the deterministic white-background algorithm's scope.
++- SVG receives no raster background removal or cropping.
+ - Browser MIME reporting is required and may vary for unusually generated files.
+ - SVG intrinsic dimensions depend on information the browser can derive.
+-- The current project has no automated test runner; validation remains pure for later coverage.
+ - The module does not persist a selection across navigation or refresh.
+ 
+ ## Relationship to the logo engine
+diff --git a/docs/products/Pocket_Paper.md b/docs/products/Pocket_Paper.md
+index 8b5f8fe..71c58dd 100644
+--- a/docs/products/Pocket_Paper.md
++++ b/docs/products/Pocket_Paper.md
+@@ -1,6 +1,27 @@
+ # Pocket Paper
+ 
+-**Draft — to be expanded.**
++Pocket Paper is the first product supported by the DiellArt Mockup Studio.
+ 
+-Pocket Paper is the first product planned for the DiellArt Mockup Studio. Product dimensions, printable areas, artwork constraints, and rendering coordinates will be documented only after verified specifications are available.
++## Dimensions
+ 
++- Product width: 100 mm
++- Product height: 200 mm
++- Printable front panel: 100 mm × 130 mm
++- Printable panel start: 70 mm from the top
++
++The printable panel therefore occupies `x: 0`, `y: 0.35`, `width: 1`, and
++`height: 0.65` in normalised product coordinates.
++
++## Current mockup assumptions
++
++The web-ready Product View master is
++`public/mockups/pocket-paper/product-view.png` (1024 × 1536). The source remains
++at `temp/mockup.png`.
++
++The safe area removes 8% of printable-panel width from each horizontal edge and
++8% of printable-panel height from each vertical edge. Logos use
++orientation-aware safe-area usage: 88% width for wide artwork, 82% height for
++tall artwork, and an 84% balanced fit for square artwork.
++
++These values support the initial visual preview. Exact production tolerances
++and calibration still require confirmation before print approval.
+diff --git a/package-lock.json b/package-lock.json
+index d093035..e697971 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -10,9 +10,11 @@
+       "dependencies": {
+         "next": "16.2.12",
+         "react": "19.2.8",
+-        "react-dom": "19.2.8"
++        "react-dom": "19.2.8",
++        "react-image-crop": "^11.1.2"
+       },
+       "devDependencies": {
++        "@playwright/test": "^1.62.0",
+         "@tailwindcss/postcss": "4.3.3",
+         "@types/node": "^22.0.0",
+         "@types/react": "^19.0.0",
+@@ -20,7 +22,8 @@
+         "eslint": "9.39.5",
+         "eslint-config-next": "16.2.12",
+         "tailwindcss": "4.3.3",
+-        "typescript": "6.0.3"
++        "typescript": "6.0.3",
++        "vitest": "^4.1.10"
+       }
+     },
+     "node_modules/@alloc/quick-lru": {
+@@ -1319,6 +1322,348 @@
+         "node": ">=12.4.0"
+       }
+     },
++    "node_modules/@oxc-project/types": {
++      "version": "0.139.0",
++      "resolved": "https://registry.npmjs.org/@oxc-project/types/-/types-0.139.0.tgz",
++      "integrity": "sha512-r9gHphtCs+1M7J0pw6Sn/hh/Wpa/iQrOOkrNAlVLF/gHq+/CJmHIWKKUUhdWjcD6CIa8idarspCsASiXCXvFUw==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/Boshen"
++      }
++    },
++    "node_modules/@playwright/test": {
++      "version": "1.62.0",
++      "resolved": "https://registry.npmjs.org/@playwright/test/-/test-1.62.0.tgz",
++      "integrity": "sha512-9zOJ6ZQRAena31MpOH9VSzIz8Ou3YJ/wtY/eQm5T2uhfhG7/U3COrMS8xOtUrZrp9OgdmzEnIYODye3nY1VqzA==",
++      "devOptional": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright": "1.62.0"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/@rolldown/binding-android-arm64": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-android-arm64/-/binding-android-arm64-1.1.5.tgz",
++      "integrity": "sha512-lZg8fqIv2v7FF237bwMgzGZEJvGL79/s5knJ/i6FmsGF4XXlzccZ4jb+TrFIxtSSxFtIpdsgrPZeMk1I9AFcyQ==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "android"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-darwin-arm64": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-arm64/-/binding-darwin-arm64-1.1.5.tgz",
++      "integrity": "sha512-51Bnx9pNiMRKSUNtBfySkNJ9vMU9Hh3I1ozDd6gyPPYzaXCfnptUcEZxXGYFn+ul2dtcMUiqGR1Yai2K10uoTw==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-darwin-x64": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-x64/-/binding-darwin-x64-1.1.5.tgz",
++      "integrity": "sha512-Tm+gbfC0aHu1tBA/JvKQh32S0K6YgCHkiAF4/W6xX0K0RmNuc94VeK419dJoE65R5aRxmo+noZQSWrAMF6yb6g==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-freebsd-x64": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-freebsd-x64/-/binding-freebsd-x64-1.1.5.tgz",
++      "integrity": "sha512-JMzDKCCXq93YccG5gz3hvOs1oXRKAf0XYpfOS88e+wZrC8Iugj6j68867vrYZkvpDDpKn/KoKORThmchMpF6TA==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "freebsd"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-arm-gnueabihf": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm-gnueabihf/-/binding-linux-arm-gnueabihf-1.1.5.tgz",
++      "integrity": "sha512-uML21j2K5TfPGutKxub+M+nLjZIrWjXQ5Grx4lCe/nimTj9B4L63zHpjXLl4y0L3mcm2htEQIb06oCG/szerNw==",
++      "cpu": [
++        "arm"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-arm64-gnu": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-gnu/-/binding-linux-arm64-gnu-1.1.5.tgz",
++      "integrity": "sha512-navSiuTMogvnQoZoM/v+l3ZWo50/NTwSHSzheABx/RCnmUPaKwq9qSo4Br2OYRs21+Fz8uFqITZM3H4opOB0/Q==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-arm64-musl": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-musl/-/binding-linux-arm64-musl-1.1.5.tgz",
++      "integrity": "sha512-lAryqH7IteztmCXQXk0etKj4wBQ7Gx5S6LjKhsgp9zb8I5bsuvU/2llH1hDQcjsFeqIsovMVN339/8pUDDBXxA==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-ppc64-gnu": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-ppc64-gnu/-/binding-linux-ppc64-gnu-1.1.5.tgz",
++      "integrity": "sha512-fsK/sNBnxzBlL4O1JNrZakVQxPspqpED5dLtNsZS9oOKmtSpdNIzxH2kkol5HYTWJN47sE20ztMJPxfZ89qGOg==",
++      "cpu": [
++        "ppc64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-s390x-gnu": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-s390x-gnu/-/binding-linux-s390x-gnu-1.1.5.tgz",
++      "integrity": "sha512-gLYb4BIadlfTOYT5gO503n8zQjXflgzpD0FcyKh0Mzx3rqCZKnHoJWV9xe1KXUJ5lx2JfcSHr/mhzS0PC/McAA==",
++      "cpu": [
++        "s390x"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-x64-gnu": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-gnu/-/binding-linux-x64-gnu-1.1.5.tgz",
++      "integrity": "sha512-FjcpEKUyJygHgs1o50VYNvkt5+7Le/VEdYt0AkRpkL33MnyQfwr8l5mXwMmfmTbyMPr5vJLC+8/Gd9gXnwU1QQ==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "glibc"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-linux-x64-musl": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-musl/-/binding-linux-x64-musl-1.1.5.tgz",
++      "integrity": "sha512-Me+PfPI2TMeOQk0gYWfLQZtTktrmzbr8cDboqX83XKc7UrgAi55gF+2dUkWdxd19n55Essp2yeca+O9N5rBxHg==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "libc": [
++        "musl"
++      ],
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "linux"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-openharmony-arm64": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-openharmony-arm64/-/binding-openharmony-arm64-1.1.5.tgz",
++      "integrity": "sha512-yc5WrLzXks6zCQfn9Oxr8pORKyl/pF+QjHmW/Qx3qu0oyrrNC+y2JLTU1E2rcWYAmzlnqngWXHQjy51VzW70Vw==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "openharmony"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-wasm32-wasi": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-wasm32-wasi/-/binding-wasm32-wasi-1.1.5.tgz",
++      "integrity": "sha512-VbQGPX2b4r48TAMIM2cjgluIM1HYutm4pcTEJsle7iEP7sB1dFqtPLBVbdLAZCxy1txCcPxf4QFf4v8uvltPqA==",
++      "cpu": [
++        "wasm32"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "@emnapi/core": "1.11.1",
++        "@emnapi/runtime": "1.11.1",
++        "@napi-rs/wasm-runtime": "^1.1.6"
++      },
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-wasm32-wasi/node_modules/@emnapi/core": {
++      "version": "1.11.1",
++      "resolved": "https://registry.npmjs.org/@emnapi/core/-/core-1.11.1.tgz",
++      "integrity": "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==",
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "@emnapi/wasi-threads": "1.2.2",
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@rolldown/binding-wasm32-wasi/node_modules/@emnapi/runtime": {
++      "version": "1.11.1",
++      "resolved": "https://registry.npmjs.org/@emnapi/runtime/-/runtime-1.11.1.tgz",
++      "integrity": "sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==",
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@rolldown/binding-wasm32-wasi/node_modules/@emnapi/wasi-threads": {
++      "version": "1.2.2",
++      "resolved": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.2.tgz",
++      "integrity": "sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==",
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@rolldown/binding-win32-arm64-msvc": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-arm64-msvc/-/binding-win32-arm64-msvc-1.1.5.tgz",
++      "integrity": "sha512-gHv82k63z4qpV5+Q1y/12KrK0ltWBukVDI8nZcbT7Tt/ZlOIVwppazneq0F93oDxTo3IgAMEDIoQh3E2n6mVsw==",
++      "cpu": [
++        "arm64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/binding-win32-x64-msvc": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-x64-msvc/-/binding-win32-x64-msvc-1.1.5.tgz",
++      "integrity": "sha512-tTZuDBPw85tEN5PQi1pnEBzDy0Z49HtScLAbD5t6hyeU92A95pRWaSMw1GZZi/RwgSgUIl0xrSlXIT/9QzvYSA==",
++      "cpu": [
++        "x64"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "win32"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
++    "node_modules/@rolldown/pluginutils": {
++      "version": "1.0.1",
++      "resolved": "https://registry.npmjs.org/@rolldown/pluginutils/-/pluginutils-1.0.1.tgz",
++      "integrity": "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/@rtsao/scc": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/@rtsao/scc/-/scc-1.1.0.tgz",
+@@ -1326,6 +1671,13 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@standard-schema/spec": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/@standard-schema/spec/-/spec-1.1.0.tgz",
++      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/@swc/helpers": {
+       "version": "0.5.15",
+       "resolved": "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.15.tgz",
+@@ -1629,6 +1981,24 @@
+         "tslib": "^2.4.0"
+       }
+     },
++    "node_modules/@types/chai": {
++      "version": "5.2.3",
++      "resolved": "https://registry.npmjs.org/@types/chai/-/chai-5.2.3.tgz",
++      "integrity": "sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/deep-eql": "*",
++        "assertion-error": "^2.0.1"
++      }
++    },
++    "node_modules/@types/deep-eql": {
++      "version": "4.0.2",
++      "resolved": "https://registry.npmjs.org/@types/deep-eql/-/deep-eql-4.0.2.tgz",
++      "integrity": "sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/@types/estree": {
+       "version": "1.0.9",
+       "resolved": "https://registry.npmjs.org/@types/estree/-/estree-1.0.9.tgz",
+@@ -2079,10 +2449,123 @@
+       ],
+       "dev": true,
+       "license": "MIT",
+-      "optional": true,
+-      "os": [
+-        "win32"
+-      ]
++      "optional": true,
++      "os": [
++        "win32"
++      ]
++    },
++    "node_modules/@vitest/expect": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/@vitest/expect/-/expect-4.1.10.tgz",
++      "integrity": "sha512-YsCn+qAk1GWjQOWFEsEcL2gNQ0zmVmQu3T03qP6UyjhtmdtwtbuI+DASn/7iQB3HGTXkdBwGddzxPlmiql5vlA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@standard-schema/spec": "^1.1.0",
++        "@types/chai": "^5.2.2",
++        "@vitest/spy": "4.1.10",
++        "@vitest/utils": "4.1.10",
++        "chai": "^6.2.2",
++        "tinyrainbow": "^3.1.0"
++      },
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      }
++    },
++    "node_modules/@vitest/mocker": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/@vitest/mocker/-/mocker-4.1.10.tgz",
++      "integrity": "sha512-v0xaezt+DKEmKfaxg133ldzADrwLGd7Ze1MfQQTYfvs8OqZIwbxyxaYURivwV7sWy5fqn3rH5uOrSp07bp44Ow==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@vitest/spy": "4.1.10",
++        "estree-walker": "^3.0.3",
++        "magic-string": "^0.30.21"
++      },
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      },
++      "peerDependencies": {
++        "msw": "^2.4.9",
++        "vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
++      },
++      "peerDependenciesMeta": {
++        "msw": {
++          "optional": true
++        },
++        "vite": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/@vitest/pretty-format": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/@vitest/pretty-format/-/pretty-format-4.1.10.tgz",
++      "integrity": "sha512-W1HsjSH4MXQ9YfmmhLAoIYf1HRfekQCGngeIgcei6MP5QQGWUe0gkopdZQaVCFO+JDJMrAJGwa5pRpNpvy4P8Q==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "tinyrainbow": "^3.1.0"
++      },
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      }
++    },
++    "node_modules/@vitest/runner": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/@vitest/runner/-/runner-4.1.10.tgz",
++      "integrity": "sha512-IKI6kpIH+LmpROplyLwBBaCfMgOZOMsygVa6BARD6ahA04VRuJSa6OaVG7kRvSEMD870Vd91rSSw0eegtWyLGg==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@vitest/utils": "4.1.10",
++        "pathe": "^2.0.3"
++      },
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      }
++    },
++    "node_modules/@vitest/snapshot": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/@vitest/snapshot/-/snapshot-4.1.10.tgz",
++      "integrity": "sha512-xRkfOT1qpTAi/Ti4Y1LtfRc3kEuqxGw59eN2jN9pRWMtS/XDevekhcFSqvQqjUNGksfjMJu3Y+oJ+4Ypn2OaJw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@vitest/pretty-format": "4.1.10",
++        "@vitest/utils": "4.1.10",
++        "magic-string": "^0.30.21",
++        "pathe": "^2.0.3"
++      },
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      }
++    },
++    "node_modules/@vitest/spy": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/@vitest/spy/-/spy-4.1.10.tgz",
++      "integrity": "sha512-PLf/Ugvoq5wO/b4rwYCR1h2PSIdXz7wnkQFMiUpLdtM7l6pqVFcQIBEHyT1+l+cj7mNwAfZHzqXqDyjvOuwbDw==",
++      "dev": true,
++      "license": "MIT",
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      }
++    },
++    "node_modules/@vitest/utils": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/@vitest/utils/-/utils-4.1.10.tgz",
++      "integrity": "sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@vitest/pretty-format": "4.1.10",
++        "convert-source-map": "^2.0.0",
++        "tinyrainbow": "^3.1.0"
++      },
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      }
+     },
+     "node_modules/acorn": {
+       "version": "8.17.0",
+@@ -2317,6 +2800,16 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/assertion-error": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/assertion-error/-/assertion-error-2.0.1.tgz",
++      "integrity": "sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      }
++    },
+     "node_modules/ast-types-flow": {
+       "version": "0.0.8",
+       "resolved": "https://registry.npmjs.org/ast-types-flow/-/ast-types-flow-0.0.8.tgz",
+@@ -2527,6 +3020,16 @@
+       ],
+       "license": "CC-BY-4.0"
+     },
++    "node_modules/chai": {
++      "version": "6.2.2",
++      "resolved": "https://registry.npmjs.org/chai/-/chai-6.2.2.tgz",
++      "integrity": "sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      }
++    },
+     "node_modules/chalk": {
+       "version": "4.1.2",
+       "resolved": "https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz",
+@@ -2930,6 +3433,13 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/es-module-lexer": {
++      "version": "2.3.1",
++      "resolved": "https://registry.npmjs.org/es-module-lexer/-/es-module-lexer-2.3.1.tgz",
++      "integrity": "sha512-shc1dbU90Yl/xq1QrC7QRtfcwURZuVRfPhZbDoldJ1cn1gzDvBaBWlv0eFolj5+0znnPJz5TXLxsN77X/12KTA==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/es-object-atoms": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/es-object-atoms/-/es-object-atoms-1.1.2.tgz",
+@@ -3681,6 +4191,16 @@
+         "node": ">=4.0"
+       }
+     },
++    "node_modules/estree-walker": {
++      "version": "3.0.3",
++      "resolved": "https://registry.npmjs.org/estree-walker/-/estree-walker-3.0.3.tgz",
++      "integrity": "sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@types/estree": "^1.0.0"
++      }
++    },
+     "node_modules/esutils": {
+       "version": "2.0.3",
+       "resolved": "https://registry.npmjs.org/esutils/-/esutils-2.0.3.tgz",
+@@ -3691,6 +4211,16 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/expect-type": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/expect-type/-/expect-type-1.4.0.tgz",
++      "integrity": "sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=12.0.0"
++      }
++    },
+     "node_modules/fast-deep-equal": {
+       "version": "3.1.3",
+       "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
+@@ -3832,6 +4362,21 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/fsevents": {
++      "version": "2.3.3",
++      "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
++      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
++      "dev": true,
++      "hasInstallScript": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^8.16.0 || ^10.6.0 || >=11.0.0"
++      }
++    },
+     "node_modules/function-bind": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/function-bind/-/function-bind-1.1.2.tgz",
+@@ -5469,6 +6014,20 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/obug": {
++      "version": "2.1.4",
++      "resolved": "https://registry.npmjs.org/obug/-/obug-2.1.4.tgz",
++      "integrity": "sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==",
++      "dev": true,
++      "funding": [
++        "https://github.com/sponsors/sxzz",
++        "https://opencollective.com/debug"
++      ],
++      "license": "MIT",
++      "engines": {
++        "node": ">=12.20.0"
++      }
++    },
+     "node_modules/optionator": {
+       "version": "0.9.4",
+       "resolved": "https://registry.npmjs.org/optionator/-/optionator-0.9.4.tgz",
+@@ -5578,6 +6137,13 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/pathe": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/pathe/-/pathe-2.0.3.tgz",
++      "integrity": "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/picocolors": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz",
+@@ -5597,6 +6163,52 @@
+         "url": "https://github.com/sponsors/jonschlinkert"
+       }
+     },
++    "node_modules/playwright": {
++      "version": "1.62.0",
++      "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.62.0.tgz",
++      "integrity": "sha512-Z14dG305dgaLu6foB1TXQagFiW8JfSUIUaUuPaKQ6NtBPKF1P/qXcqfh6c6K/icPqdy37JmjbiBXf6JNg6Sylw==",
++      "devOptional": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright-core": "1.62.0"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      },
++      "optionalDependencies": {
++        "fsevents": "2.3.2"
++      }
++    },
++    "node_modules/playwright-core": {
++      "version": "1.62.0",
++      "resolved": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.62.0.tgz",
++      "integrity": "sha512-nsNRyq0r2zsG8AcRHWknc9QRA5XCueC7gWMrs+Gx2tlZn9hcl8zudfh00lhJPY1DE7NmZ6bDsT9g2yey8mXljA==",
++      "devOptional": true,
++      "license": "Apache-2.0",
++      "bin": {
++        "playwright-core": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/playwright/node_modules/fsevents": {
++      "version": "2.3.2",
++      "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.2.tgz",
++      "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==",
++      "hasInstallScript": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^8.16.0 || ^10.6.0 || >=11.0.0"
++      }
++    },
+     "node_modules/possible-typed-array-names": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/possible-typed-array-names/-/possible-typed-array-names-1.1.0.tgz",
+@@ -5710,6 +6322,15 @@
+         "react": "^19.2.8"
+       }
+     },
++    "node_modules/react-image-crop": {
++      "version": "11.1.2",
++      "resolved": "https://registry.npmjs.org/react-image-crop/-/react-image-crop-11.1.2.tgz",
++      "integrity": "sha512-+0Pc2fxpwKL4u4oLmdKBw8XSwUceFbXbKEHvFOlsl/MGB1OVNic4uBlAPmEHGXYgoJIq+b63xHbc/aJMG0AVkA==",
++      "license": "ISC",
++      "peerDependencies": {
++        "react": ">=16.13.1"
++      }
++    },
+     "node_modules/react-is": {
+       "version": "16.13.1",
+       "resolved": "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz",
+@@ -5816,6 +6437,40 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/rolldown": {
++      "version": "1.1.5",
++      "resolved": "https://registry.npmjs.org/rolldown/-/rolldown-1.1.5.tgz",
++      "integrity": "sha512-t9z29cJjXf/vxQ8dyhCSpt6H6aSwHTk8cT5I3iy6SMXuFpk5mB6PL6XfC8PCwrPTx93udwKUm9HRteAlTGBLiA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@oxc-project/types": "=0.139.0",
++        "@rolldown/pluginutils": "^1.0.0"
++      },
++      "bin": {
++        "rolldown": "bin/cli.mjs"
++      },
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      },
++      "optionalDependencies": {
++        "@rolldown/binding-android-arm64": "1.1.5",
++        "@rolldown/binding-darwin-arm64": "1.1.5",
++        "@rolldown/binding-darwin-x64": "1.1.5",
++        "@rolldown/binding-freebsd-x64": "1.1.5",
++        "@rolldown/binding-linux-arm-gnueabihf": "1.1.5",
++        "@rolldown/binding-linux-arm64-gnu": "1.1.5",
++        "@rolldown/binding-linux-arm64-musl": "1.1.5",
++        "@rolldown/binding-linux-ppc64-gnu": "1.1.5",
++        "@rolldown/binding-linux-s390x-gnu": "1.1.5",
++        "@rolldown/binding-linux-x64-gnu": "1.1.5",
++        "@rolldown/binding-linux-x64-musl": "1.1.5",
++        "@rolldown/binding-openharmony-arm64": "1.1.5",
++        "@rolldown/binding-wasm32-wasi": "1.1.5",
++        "@rolldown/binding-win32-arm64-msvc": "1.1.5",
++        "@rolldown/binding-win32-x64-msvc": "1.1.5"
++      }
++    },
+     "node_modules/run-parallel": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/run-parallel/-/run-parallel-1.2.0.tgz",
+@@ -6117,6 +6772,13 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/siginfo": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/siginfo/-/siginfo-2.0.0.tgz",
++      "integrity": "sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==",
++      "dev": true,
++      "license": "ISC"
++    },
+     "node_modules/source-map-js": {
+       "version": "1.2.1",
+       "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz",
+@@ -6133,6 +6795,20 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/stackback": {
++      "version": "0.0.2",
++      "resolved": "https://registry.npmjs.org/stackback/-/stackback-0.0.2.tgz",
++      "integrity": "sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/std-env": {
++      "version": "4.2.0",
++      "resolved": "https://registry.npmjs.org/std-env/-/std-env-4.2.0.tgz",
++      "integrity": "sha512-oCUKSupKTHX53EyjDtuZQ64pjLJ6yYCtpmEw0goYxtjG9KpbRe8KAsl2tBUGU9DyMcJ0RwJ8GqJAFzMXcXW1Rw==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/stop-iteration-iterator": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/stop-iteration-iterator/-/stop-iteration-iterator-1.1.0.tgz",
+@@ -6354,6 +7030,23 @@
+         "url": "https://opencollective.com/webpack"
+       }
+     },
++    "node_modules/tinybench": {
++      "version": "2.9.0",
++      "resolved": "https://registry.npmjs.org/tinybench/-/tinybench-2.9.0.tgz",
++      "integrity": "sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/tinyexec": {
++      "version": "1.2.4",
++      "resolved": "https://registry.npmjs.org/tinyexec/-/tinyexec-1.2.4.tgz",
++      "integrity": "sha512-SHf/r48b7vOrjve9PxJo3MN5v5yuyjHvdUcrQffT3WXMUfnGmHDVbC4k3sHJaJTgZCwpUplIaAo5ANtMyp3YHg==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      }
++    },
+     "node_modules/tinyglobby": {
+       "version": "0.2.17",
+       "resolved": "https://registry.npmjs.org/tinyglobby/-/tinyglobby-0.2.17.tgz",
+@@ -6402,6 +7095,16 @@
+         "url": "https://github.com/sponsors/jonschlinkert"
+       }
+     },
++    "node_modules/tinyrainbow": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/tinyrainbow/-/tinyrainbow-3.1.0.tgz",
++      "integrity": "sha512-Bf+ILmBgretUrdJxzXM0SgXLZ3XfiaUuOj/IKQHuTXip+05Xn+uyEYdVg0kYDipTBcLrCVyUzAPz7QmArb0mmw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=14.0.0"
++      }
++    },
+     "node_modules/to-regex-range": {
+       "version": "5.0.1",
+       "resolved": "https://registry.npmjs.org/to-regex-range/-/to-regex-range-5.0.1.tgz",
+@@ -6670,6 +7373,200 @@
+         "punycode": "^2.1.0"
+       }
+     },
++    "node_modules/vite": {
++      "version": "8.1.5",
++      "resolved": "https://registry.npmjs.org/vite/-/vite-8.1.5.tgz",
++      "integrity": "sha512-7ULLwsCdYx/nRyrpiEwvqb5TFHrMVZyBt+rg/OAXT7rgj/z+DtTDyKFeLAdDkubDVDKD8jOsndmy7m55XcfUsw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "lightningcss": "^1.32.0",
++        "picomatch": "^4.0.5",
++        "postcss": "^8.5.17",
++        "rolldown": "~1.1.5",
++        "tinyglobby": "^0.2.17"
++      },
++      "bin": {
++        "vite": "bin/vite.js"
++      },
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      },
++      "funding": {
++        "url": "https://github.com/vitejs/vite?sponsor=1"
++      },
++      "optionalDependencies": {
++        "fsevents": "~2.3.3"
++      },
++      "peerDependencies": {
++        "@types/node": "^20.19.0 || >=22.12.0",
++        "@vitejs/devtools": "^0.3.0",
++        "esbuild": "^0.27.0 || ^0.28.0",
++        "jiti": ">=1.21.0",
++        "less": "^4.0.0",
++        "sass": "^1.70.0",
++        "sass-embedded": "^1.70.0",
++        "stylus": ">=0.54.8",
++        "sugarss": "^5.0.0",
++        "terser": "^5.16.0",
++        "tsx": "^4.8.1",
++        "yaml": "^2.4.2"
++      },
++      "peerDependenciesMeta": {
++        "@types/node": {
++          "optional": true
++        },
++        "@vitejs/devtools": {
++          "optional": true
++        },
++        "esbuild": {
++          "optional": true
++        },
++        "jiti": {
++          "optional": true
++        },
++        "less": {
++          "optional": true
++        },
++        "sass": {
++          "optional": true
++        },
++        "sass-embedded": {
++          "optional": true
++        },
++        "stylus": {
++          "optional": true
++        },
++        "sugarss": {
++          "optional": true
++        },
++        "terser": {
++          "optional": true
++        },
++        "tsx": {
++          "optional": true
++        },
++        "yaml": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/vite/node_modules/picomatch": {
++      "version": "4.0.5",
++      "resolved": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.5.tgz",
++      "integrity": "sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/jonschlinkert"
++      }
++    },
++    "node_modules/vitest": {
++      "version": "4.1.10",
++      "resolved": "https://registry.npmjs.org/vitest/-/vitest-4.1.10.tgz",
++      "integrity": "sha512-R9jUTe5S4Qb0HCd4TNqpC7oGcrMssMRGXLW80ubjWsW9VH5GF8y1Y0SFLY9AbqSk6nt0PnOx4H4WNJYZ13GUPw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "@vitest/expect": "4.1.10",
++        "@vitest/mocker": "4.1.10",
++        "@vitest/pretty-format": "4.1.10",
++        "@vitest/runner": "4.1.10",
++        "@vitest/snapshot": "4.1.10",
++        "@vitest/spy": "4.1.10",
++        "@vitest/utils": "4.1.10",
++        "es-module-lexer": "^2.0.0",
++        "expect-type": "^1.3.0",
++        "magic-string": "^0.30.21",
++        "obug": "^2.1.1",
++        "pathe": "^2.0.3",
++        "picomatch": "^4.0.3",
++        "std-env": "^4.0.0-rc.1",
++        "tinybench": "^2.9.0",
++        "tinyexec": "^1.0.2",
++        "tinyglobby": "^0.2.15",
++        "tinyrainbow": "^3.1.0",
++        "vite": "^6.0.0 || ^7.0.0 || ^8.0.0",
++        "why-is-node-running": "^2.3.0"
++      },
++      "bin": {
++        "vitest": "vitest.mjs"
++      },
++      "engines": {
++        "node": "^20.0.0 || ^22.0.0 || >=24.0.0"
++      },
++      "funding": {
++        "url": "https://opencollective.com/vitest"
++      },
++      "peerDependencies": {
++        "@edge-runtime/vm": "*",
++        "@opentelemetry/api": "^1.9.0",
++        "@types/node": "^20.0.0 || ^22.0.0 || >=24.0.0",
++        "@vitest/browser-playwright": "4.1.10",
++        "@vitest/browser-preview": "4.1.10",
++        "@vitest/browser-webdriverio": "4.1.10",
++        "@vitest/coverage-istanbul": "4.1.10",
++        "@vitest/coverage-v8": "4.1.10",
++        "@vitest/ui": "4.1.10",
++        "happy-dom": "*",
++        "jsdom": "*",
++        "vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
++      },
++      "peerDependenciesMeta": {
++        "@edge-runtime/vm": {
++          "optional": true
++        },
++        "@opentelemetry/api": {
++          "optional": true
++        },
++        "@types/node": {
++          "optional": true
++        },
++        "@vitest/browser-playwright": {
++          "optional": true
++        },
++        "@vitest/browser-preview": {
++          "optional": true
++        },
++        "@vitest/browser-webdriverio": {
++          "optional": true
++        },
++        "@vitest/coverage-istanbul": {
++          "optional": true
++        },
++        "@vitest/coverage-v8": {
++          "optional": true
++        },
++        "@vitest/ui": {
++          "optional": true
++        },
++        "happy-dom": {
++          "optional": true
++        },
++        "jsdom": {
++          "optional": true
++        },
++        "vite": {
++          "optional": false
++        }
++      }
++    },
++    "node_modules/vitest/node_modules/picomatch": {
++      "version": "4.0.5",
++      "resolved": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.5.tgz",
++      "integrity": "sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=12"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/jonschlinkert"
++      }
++    },
+     "node_modules/which": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+@@ -6775,6 +7672,23 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/why-is-node-running": {
++      "version": "2.3.0",
++      "resolved": "https://registry.npmjs.org/why-is-node-running/-/why-is-node-running-2.3.0.tgz",
++      "integrity": "sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "siginfo": "^2.0.0",
++        "stackback": "0.0.2"
++      },
++      "bin": {
++        "why-is-node-running": "cli.js"
++      },
++      "engines": {
++        "node": ">=8"
++      }
++    },
+     "node_modules/word-wrap": {
+       "version": "1.2.5",
+       "resolved": "https://registry.npmjs.org/word-wrap/-/word-wrap-1.2.5.tgz",
+diff --git a/package.json b/package.json
+index 1d380c7..a32db6d 100644
+--- a/package.json
++++ b/package.json
+@@ -6,14 +6,19 @@
+     "dev": "next dev",
+     "build": "next build",
+     "start": "next start",
+-    "lint": "eslint ."
++    "lint": "eslint .",
++    "test": "vitest run",
++    "test:e2e": "playwright test",
++    "typecheck": "tsc --noEmit"
+   },
+   "dependencies": {
+     "next": "16.2.12",
+     "react": "19.2.8",
+-    "react-dom": "19.2.8"
++    "react-dom": "19.2.8",
++    "react-image-crop": "^11.1.2"
+   },
+   "devDependencies": {
++    "@playwright/test": "^1.62.0",
+     "@tailwindcss/postcss": "4.3.3",
+     "@types/node": "^22.0.0",
+     "@types/react": "^19.0.0",
+@@ -21,6 +26,7 @@
+     "eslint": "9.39.5",
+     "eslint-config-next": "16.2.12",
+     "tailwindcss": "4.3.3",
+-    "typescript": "6.0.3"
++    "typescript": "6.0.3",
++    "vitest": "^4.1.10"
+   }
+ }
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 31b9eed..ef33715 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -1,4 +1,5 @@
+ @import "tailwindcss";
++@import "react-image-crop/dist/ReactCrop.css";
+ 
+ :root {
+   color-scheme: light;
+@@ -259,9 +260,8 @@ a {
+ .brand-product { color: var(--color-text-muted); font-size: var(--text-label); font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+ .header-label { color: var(--color-text-muted); }
+ 
+-.hero { padding-bottom: var(--space-20); text-align: center; }
++.hero { padding-block: clamp(2.75rem, 6vw, 5rem) var(--space-8); text-align: center; }
+ .hero-description { max-width: 42rem; margin-inline: auto; }
+-.hero-cta { margin-top: var(--space-8); text-decoration: none; }
+ 
+ .upload-section {
+   padding-top: 0;
+@@ -276,8 +276,8 @@ a {
+   grid-template-columns: auto 1fr auto;
+   gap: var(--space-6);
+   align-items: center;
+-  min-height: 15rem;
+-  padding: clamp(1.5rem, 5vw, 3rem);
++  min-height: 9.5rem;
++  padding: clamp(1.25rem, 3vw, 2rem);
+   border: 2px dashed var(--color-border-strong);
+   border-radius: var(--radius-large);
+   background: var(--color-surface);
+@@ -382,6 +382,357 @@ a {
+ .preview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }
+ .preview-card { overflow: hidden; }
+ .preview-card-content { padding: var(--space-6); }
++.preview-card-product { padding: 0; }
++
++.personaliser-upload { margin-bottom: var(--section-space); }
++.proof-workspace {
++  display: grid;
++  grid-template-columns: minmax(0, 2.65fr) minmax(17rem, 1fr);
++  gap: clamp(1.25rem, 2.5vw, 2rem);
++  align-items: start;
++  scroll-margin-top: var(--space-4);
++}
++.proof-main { min-width: 0; }
++.proof-heading {
++  display: flex;
++  align-items: flex-end;
++  justify-content: space-between;
++  gap: var(--space-4);
++  margin-bottom: var(--space-5);
++}
++.proof-toolbar { display: flex; flex: none; gap: var(--space-2); }
++.proof-tool-button {
++  display: inline-grid;
++  width: 2.75rem;
++  height: 2.75rem;
++  place-items: center;
++  border: var(--border-strong);
++  border-radius: var(--radius-small);
++  background: var(--color-surface);
++  color: var(--color-text-primary);
++  cursor: pointer;
++}
++.proof-tool-button:hover { border-color: var(--color-accent); background: var(--color-surface-muted); }
++.proof-tool-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-accent) 35%, transparent); outline-offset: 2px; }
++.proof-tool-button svg {
++  width: 1.25rem;
++  height: 1.25rem;
++  fill: none;
++  stroke: currentColor;
++  stroke-width: 1.7;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++.proof-tool-remove { border-style: dashed; }
++.proof-product-name {
++  margin: var(--space-2) 0 0;
++  color: var(--color-text-secondary);
++  font-size: var(--text-supporting);
++  font-weight: 650;
++}
++.proof-stage {
++  display: grid;
++  min-height: clamp(31rem, 62vh, 43rem);
++  place-items: center;
++  overflow: hidden;
++  border: var(--border-thin);
++  border-radius: var(--radius-large);
++  background: radial-gradient(circle at 50% 35%, #fff 0%, var(--color-surface-muted) 75%);
++}
++.proof-help {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: var(--space-5);
++  margin-bottom: var(--space-4);
++  padding: var(--space-5);
++  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, white);
++  border-radius: var(--radius-medium);
++  background: color-mix(in srgb, var(--color-accent) 6%, white);
++}
++.proof-help .text-supporting { margin-top: var(--space-1); }
++.customer-status {
++  color: var(--color-text-secondary);
++  font-size: var(--text-body);
++  font-weight: 650;
++}
++.crop-workspace-full {
++  display: grid;
++  min-height: min(72vh, 48rem);
++  place-items: center;
++  scroll-margin-top: var(--space-4);
++}
++.crop-workspace-full .crop-workflow {
++  width: min(100%, 58rem);
++  border: var(--border-thin);
++  border-radius: var(--radius-large);
++  background: var(--color-surface);
++}
++.approval-success { display: grid; gap: var(--space-4); }
++.approval-success .text-supporting { margin-top: 0; }
++.proof-stage .mockup-stage { width: min(100%, 32rem); }
++.proof-disclaimer {
++  max-width: 52rem;
++  margin: var(--space-4) 0 0;
++  color: var(--color-text-muted);
++  font-size: var(--text-supporting);
++  line-height: 1.6;
++}
++.gesture-instruction {
++  margin: var(--space-3) 0 0;
++  color: var(--color-text-muted);
++  font-size: var(--text-supporting);
++  text-align: center;
++}
++.proof-sidebar { position: sticky; top: var(--space-4); }
++.mobile-print-colour { display: none; }
++.print-colour-selector {
++  display: grid;
++  gap: var(--space-3);
++  margin: 0 0 var(--space-4);
++  padding: var(--space-5);
++  border: var(--border-thin);
++  border-radius: var(--radius-large);
++  background: var(--color-surface);
++}
++.print-colour-selector legend {
++  padding-inline: var(--space-1);
++  font-size: var(--text-supporting);
++  font-weight: 700;
++}
++.print-colour-supporting {
++  margin: 0;
++  color: var(--color-text-muted);
++  font-size: var(--text-label);
++  line-height: 1.35;
++}
++.print-colour-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
++.print-colour-option {
++  display: grid;
++  min-height: 3rem;
++  grid-template-columns: 1.5rem 1fr 1rem;
++  align-items: center;
++  gap: var(--space-2);
++  padding: var(--space-2);
++  border: var(--border-strong);
++  border-radius: var(--radius-small);
++  background: var(--color-surface);
++  color: var(--color-text-primary);
++  cursor: pointer;
++  font: inherit;
++  font-size: var(--text-label);
++  text-align: left;
++}
++.print-colour-option[aria-pressed="true"] {
++  border-color: var(--color-accent);
++  box-shadow: inset 0 0 0 1px var(--color-accent);
++  font-weight: 700;
++}
++.print-colour-option:focus-visible {
++  outline: 3px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
++  outline-offset: 2px;
++}
++.print-colour-swatch {
++  width: 1.5rem;
++  height: 1.5rem;
++  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
++  border-radius: 50%;
++}
++.print-colour-check { text-align: center; }
++.artwork-panel { display: flex; flex-direction: column; }
++.artwork-panel-heading { padding: var(--space-6) var(--space-6) 0; }
++.artwork-controls {
++  display: grid;
++  gap: var(--space-3);
++  padding: var(--space-5) var(--space-6) var(--space-6);
++}
++.candidate-review {
++  display: grid;
++  gap: var(--space-3);
++  padding-bottom: var(--space-4);
++  border-bottom: var(--border-thin);
++}
++.candidate-review .text-supporting { margin-top: 0; }
++.candidate-previews {
++  display: grid;
++  width: 100%;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: var(--space-3);
++}
++.candidate-previews figure { min-width: 0; margin: 0; text-align: center; }
++.candidate-previews img { width: 100%; height: 7rem; object-fit: contain; }
++.candidate-previews figcaption {
++  margin-top: var(--space-2);
++  color: var(--color-text-muted);
++  font-size: var(--text-label);
++  font-weight: 650;
++}
++.crop-workflow {
++  display: grid;
++  width: min(100%, 46rem);
++  gap: var(--space-5);
++  padding: clamp(1rem, 3vw, 2rem);
++}
++.crop-workflow .text-section-heading { margin-top: var(--space-2); }
++.crop-canvas {
++  display: grid;
++  max-height: 55vh;
++  place-items: center;
++  overflow: hidden;
++  border-radius: var(--radius-medium);
++  background: #25221e;
++}
++.crop-canvas .ReactCrop__drag-handle {
++  width: 1rem;
++  height: 1rem;
++}
++.crop-canvas .ReactCrop { max-width: 100%; }
++.crop-canvas img {
++  display: block;
++  max-width: 100%;
++  max-height: 52vh;
++  object-fit: contain;
++}
++.crop-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
++.upload-choice-actions { display: grid; gap: var(--space-2); }
++.camera-upload-action { display: none; }
++.placement-controls {
++  display: grid;
++  gap: var(--space-4);
++  padding-bottom: var(--space-3);
++  border-bottom: var(--border-thin);
++}
++.fine-tune-placement > summary {
++  display: none;
++  cursor: pointer;
++  font-size: var(--text-supporting);
++  font-weight: 650;
++}
++.fine-tune-placement > summary:focus-visible {
++  outline: 3px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
++  outline-offset: 3px;
++}
++.fine-tune-placement > .placement-controls { display: grid; margin-top: var(--space-4); }
++.mobile-reset-placement { display: none; }
++.placement-control {
++  display: grid;
++  gap: var(--space-2);
++  color: var(--color-text-primary);
++  font-size: var(--text-supporting);
++  font-weight: 650;
++}
++.placement-control > span {
++  display: flex;
++  align-items: baseline;
++  justify-content: space-between;
++  gap: var(--space-3);
++}
++.placement-control output {
++  color: var(--color-text-muted);
++  font-size: var(--text-label);
++  font-weight: 600;
++}
++.placement-control input[type="range"] {
++  width: 100%;
++  min-height: 2.75rem;
++  accent-color: var(--color-accent);
++  cursor: pointer;
++}
++.size-scale-labels {
++  display: grid;
++  grid-template-columns: repeat(3, 1fr);
++  color: var(--color-text-muted);
++  font-size: 0.675rem;
++  font-weight: 550;
++}
++.size-scale-labels span:nth-child(2) { text-align: center; }
++.size-scale-labels span:last-child { text-align: right; }
++.recommended-marker { color: var(--color-accent); }
++.position-control {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(2.75rem, 1fr));
++  grid-template-areas:
++    ". up ."
++    "left centre right"
++    ". down .";
++  gap: var(--space-2);
++  min-width: 0;
++  padding: 0;
++  border: 0;
++}
++.position-control legend {
++  margin-bottom: var(--space-2);
++  font-size: var(--text-supporting);
++  font-weight: 650;
++}
++.position-button,
++.position-centre {
++  min-width: 2.75rem;
++  min-height: 2.75rem;
++  border: var(--border-strong);
++  border-radius: var(--radius-small);
++  background: var(--color-surface);
++  color: var(--color-text-primary);
++  cursor: pointer;
++  font: inherit;
++  font-weight: 650;
++}
++.position-button:hover,
++.position-centre:hover { border-color: var(--color-accent); background: var(--color-surface-muted); }
++.position-up { grid-area: up; }
++.position-left { grid-area: left; }
++.position-centre { grid-area: centre; font-size: var(--text-label); }
++.position-right { grid-area: right; }
++.position-down { grid-area: down; }
++.artwork-panel .logo-preview-image-wrap {
++  min-height: 12rem;
++  padding: var(--space-5);
++  border-block: var(--border-thin);
++}
++.artwork-panel .logo-preview-image { max-height: 10rem; }
++.artwork-panel .logo-preview-details { padding: var(--space-5) var(--space-6) var(--space-6); }
++.artwork-panel .logo-metadata { margin-top: 0; }
++.upload-warning { color: var(--color-text-secondary); }
++.lifestyle-section { margin-top: var(--section-space); }
++.mockup-panel {
++  display: grid;
++  min-height: 31rem;
++  place-items: center;
++  padding: clamp(1rem, 3vw, 2rem);
++  background: radial-gradient(circle at 50% 35%, #fff 0%, var(--color-surface-muted) 72%);
++}
++.mockup-stage {
++  position: relative;
++  width: min(100%, 20rem);
++  aspect-ratio: 2 / 3;
++  flex: none;
++}
++.mockup-product-image { object-fit: contain; }
++.mockup-logo {
++  position: absolute;
++  z-index: 1;
++  height: auto;
++  object-fit: contain;
++  cursor: grab;
++  touch-action: none;
++  user-select: none;
++  -webkit-user-drag: none;
++}
++.mockup-logo:active { cursor: grabbing; }
++.mockup-stage[data-interaction-mode="drag"] .mockup-logo,
++.mockup-stage[data-interaction-mode="pinch"] .mockup-logo {
++  outline: 1px dashed color-mix(in srgb, var(--color-accent) 55%, transparent);
++  outline-offset: 4px;
++}
++.mockup-debug-product {
++  position: absolute;
++  z-index: 2;
++  border: 2px solid #d02f49;
++  pointer-events: none;
++}
++.mockup-debug-surface { position: absolute; border: 2px solid #e58b19; }
++.mockup-debug-safe { position: absolute; border: 2px dashed #2677d8; }
++.mockup-debug-logo { position: absolute; z-index: 3; border: 2px solid #1b9c4b; pointer-events: none; }
+ 
+ .placeholder-panel {
+   position: relative;
+@@ -424,13 +775,76 @@ a {
+ @media (max-width: 767px) {
+   .brand-product { display: none; }
+   .preview-grid { grid-template-columns: 1fr; }
+-  .upload-dropzone { grid-template-columns: auto 1fr; min-height: 18rem; padding: var(--space-6); }
++  .upload-dropzone { grid-template-columns: auto 1fr; min-height: 12rem; padding: var(--space-6); }
+   .upload-dropzone .button { grid-column: 1 / -1; width: 100%; }
+   .logo-preview { grid-template-columns: 1fr; }
+   .logo-preview-image-wrap { min-height: 17rem; }
++  .proof-workspace { grid-template-columns: 1fr; }
++  .proof-heading { align-items: center; }
++  .mobile-print-colour { display: block; margin-bottom: var(--space-3); }
++  .desktop-print-colour { display: none; }
++  .print-colour-selector-compact {
++    gap: var(--space-2);
++    margin: 0;
++    padding: var(--space-3);
++    border-radius: var(--radius-medium);
++  }
++  .print-colour-selector-compact .print-colour-supporting { display: none; }
++  .print-colour-selector-compact .print-colour-options {
++    grid-template-columns: repeat(4, minmax(0, 1fr));
++    gap: var(--space-1);
++  }
++  .print-colour-selector-compact .print-colour-option {
++    min-width: 0;
++    min-height: 2.75rem;
++    grid-template-columns: 1.5rem minmax(0, 1fr);
++    grid-template-areas:
++      "swatch check"
++      "label label";
++    gap: 0.125rem var(--space-1);
++    padding: var(--space-1);
++    text-align: center;
++  }
++  .print-colour-selector-compact .print-colour-swatch {
++    grid-area: swatch;
++    justify-self: end;
++  }
++  .print-colour-selector-compact .print-colour-option > span:nth-child(2) {
++    grid-area: label;
++    min-width: 0;
++    overflow-wrap: anywhere;
++  }
++  .print-colour-selector-compact .print-colour-check {
++    grid-area: check;
++    justify-self: start;
++  }
++  .proof-stage { min-height: 27rem; }
++  .proof-stage .mockup-stage { width: min(100%, 19rem); }
++  .proof-sidebar { position: static; }
++  .proof-help { align-items: stretch; flex-direction: column; }
++  .proof-help .button { width: 100%; }
++  .artwork-panel .artwork-panel-heading { order: 1; }
++  .artwork-panel .artwork-controls { order: 2; }
++  .artwork-panel .logo-preview-image-wrap { order: 3; }
++  .artwork-panel .logo-preview-details { order: 4; }
++  .artwork-controls .button { width: 100%; }
++  .artwork-controls .mobile-reset-placement { display: inline-flex; order: 1; }
++  .artwork-controls .approval-button { order: 2; }
++  .artwork-controls .fine-tune-placement { order: 3; }
++  .fine-tune-placement > summary { display: list-item; }
++  .fine-tune-placement:not([open]) > .placement-controls { display: none; }
++  .artwork-controls .desktop-reset-placement { display: none; }
++  .crop-actions { display: grid; }
++  .crop-actions .button { width: 100%; }
++  .mockup-panel { min-height: 26rem; }
++  .mockup-stage { width: min(100%, 16rem); }
+   .site-footer-inner { align-items: flex-start; flex-direction: column; }
+ }
+ 
++@media (hover: none) and (pointer: coarse) {
++  .camera-upload-action { display: inline-flex; }
++}
++
+ @media (max-width: 420px) {
+   .header-label { display: none; }
+   .upload-dropzone { grid-template-columns: 1fr; text-align: center; }
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+index 2a2672c..53f2c98 100644
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -1,29 +1,8 @@
+ import { Footer } from "@/components/layout/Footer";
+ import { Header } from "@/components/layout/Header";
+-import { Badge } from "@/components/ui/Badge";
+ import { Container } from "@/components/ui/Container";
+-import { PreviewCard } from "@/components/ui/PreviewCard";
+ import { Section } from "@/components/ui/Section";
+-import { SectionHeader } from "@/components/ui/SectionHeader";
+-import { LogoUpload } from "@/features/upload/components/LogoUpload";
+-
+-const previews = [
+-  {
+-    title: "Product View",
+-    description: "A focused look at your personalised Pocket Paper design.",
+-    variant: "product" as const,
+-  },
+-  {
+-    title: "Main Dish Setting",
+-    description: "See your branding presented in a refined table setting.",
+-    variant: "main" as const,
+-  },
+-  {
+-    title: "Dessert Setting",
+-    description: "Preview the details in a lighter finishing-course scene.",
+-    variant: "dessert" as const,
+-  },
+-];
++import { PocketPaperPersonaliser } from "@/features/personalisation/components/PocketPaperPersonaliser";
+ 
+ export default function Home() {
+   return (
+@@ -32,23 +11,14 @@ export default function Home() {
+       <main>
+         <Section className="hero">
+           <Container size="narrow" className="hero-content">
+-            <Badge variant="accent">
+-              Pocket Paper — First product coming soon
+-            </Badge>
+             <h1 className="text-display">
+               Visualise your brand
+               <span>before you print.</span>
+             </h1>
+             <p className="text-body hero-description">
+-              Soon, you&apos;ll be able to upload your logo and preview it on
+-              personalised DiellArt products before moving to production.
++              Upload your logo and preview how it may appear on personalised
++              DiellArt products before production.
+             </p>
+-            <a
+-              href="#logo-upload"
+-              className="button button-primary button-large hero-cta"
+-            >
+-              Upload Logo
+-            </a>
+             <p className="text-supporting">
+               Your file stays private in this browser.
+             </p>
+@@ -56,25 +26,7 @@ export default function Home() {
+         </Section>
+ 
+         <Section spacing="compact" labelledBy="logo-upload-heading" className="upload-section">
+-          <Container>
+-            <LogoUpload />
+-          </Container>
+-        </Section>
+-
+-        <Section labelledBy="preview-heading" className="preview-section">
+-          <Container>
+-            <SectionHeader
+-              eyebrow="Three perspectives"
+-              heading="Your product, thoughtfully presented."
+-              description="Mockup generation is not active yet. These views will use your selected logo in a future stage."
+-              headingId="preview-heading"
+-            />
+-            <div className="preview-grid">
+-              {previews.map((preview) => (
+-                <PreviewCard key={preview.title} {...preview} />
+-              ))}
+-            </div>
+-          </Container>
++          <PocketPaperPersonaliser />
+         </Section>
+       </main>
+       <Footer />
+diff --git a/src/features/upload/components/LogoUpload.tsx b/src/features/upload/components/LogoUpload.tsx
+index 14da482..0dd34e1 100644
+--- a/src/features/upload/components/LogoUpload.tsx
++++ b/src/features/upload/components/LogoUpload.tsx
+@@ -4,20 +4,97 @@ import {
+   type ChangeEvent,
+   type DragEvent,
+   type KeyboardEvent,
++  useEffect,
+   useRef,
++  useState,
+ } from "react";
+ import { Button } from "@/components/ui/Button";
+ import { Card } from "@/components/ui/Card";
+ import { formatAspectRatio } from "@/features/upload/utils/file-metadata";
+-import { useLogoUpload } from "@/features/upload/hooks/use-logo-upload";
++import type { useLogoUpload } from "@/features/upload/hooks/use-logo-upload";
++import type { ReturnTypeOfPreparedArtwork } from "@/features/logo-engine/types/internal";
++import {
++  getSemanticSizeLabel,
++  type ArtworkPlacement,
++  type PlacementDirection,
++  type PlacementLimits,
++} from "@/features/mockup-engine/placement";
+ import {
+   LOGO_FILE_INPUT_ACCEPT,
+   MAX_LOGO_FILE_SIZE_LABEL,
+ } from "@/shared/constants/upload";
+ 
+-export function LogoUpload() {
++type LogoUploadProps = {
++  upload: ReturnType<typeof useLogoUpload>;
++  preparation?: ReturnTypeOfPreparedArtwork;
++  placement?: ArtworkPlacement;
++  onPlacementChange?: (placement: ArtworkPlacement) => void;
++  onResetPlacement?: () => void;
++  onArtworkVersionChange?: (showOriginal: boolean) => void;
++  placementLimits?: PlacementLimits;
++  onMovePlacement?: (direction: PlacementDirection) => void;
++  onCentrePlacement?: () => void;
++  simplified?: boolean;
++  recoveryOnly?: boolean;
++  approved?: boolean;
++  onApprove?: () => void;
++  onEditPlacement?: () => void;
++  hideAssetActions?: boolean;
++};
++
++function artworkStatusMessage(
++  preparation: ReturnTypeOfPreparedArtwork | undefined,
++) {
++  if (!preparation?.asset) return "Analysing your artwork…";
++  if (preparation.processingState === "analysing") return "Analysing your artwork…";
++  if (preparation.processingState === "selecting") return "Selecting logo area";
++  if (preparation.processingState === "cropping") return "Cropping selected area…";
++  if (preparation.processingState === "preparing") return "Preparing your logo…";
++  if (preparation.processingState === "needs-review") return "Needs review";
++  if (preparation.processingState === "failed") return "Preparation failed";
++  if (preparation.processingState === "ready") return "Artwork ready";
++  const result = preparation.intakeResult;
++  if (result?.requiresCrop) {
++    return "This looks like a photograph or document. The next step will allow you to select your logo.";
++  }
++  if (result?.recommendedWorkflow === "ManualReview") {
++    return "We could not identify this artwork confidently. Your original artwork has been kept for review.";
++  }
++  if (result?.classification === "LogoOnPlainBackground") return "Logo detected. Preparing your preview…";
++  if (result?.classification === "TransparentLogo") {
++    return preparation.asset.preparation.status === "processing"
++      ? "Transparent logo detected. Preparing artwork…"
++      : "Transparent logo detected. Artwork ready";
++  }
++  if (result?.classification === "Document") {
++    return "Document detected. Preparing logo…";
++  }
++  return preparation.asset.preparation.status === "processing"
++    ? "Preparing your artwork…"
++    : "Artwork ready";
++}
++
++export function LogoUpload({
++  upload,
++  preparation,
++  placement,
++  onPlacementChange,
++  onResetPlacement,
++  onArtworkVersionChange,
++  placementLimits,
++  onMovePlacement,
++  onCentrePlacement,
++  simplified = false,
++  recoveryOnly = false,
++  approved = false,
++  onApprove,
++  onEditPlacement,
++  hideAssetActions = false,
++}: LogoUploadProps) {
+   const inputRef = useRef<HTMLInputElement>(null);
++  const cameraInputRef = useRef<HTMLInputElement>(null);
+   const dragDepthRef = useRef(0);
++  const [fineTuneOpen, setFineTuneOpen] = useState(false);
+   const {
+     status,
+     logo,
+@@ -27,11 +104,19 @@ export function LogoUpload() {
+     removeLogo,
+     setDragActive,
+     dismissError,
+-  } = useLogoUpload();
++  } = upload;
+ 
+   const isValidating = status === "validating";
+   const isReplacementError = Boolean(error && logo);
+ 
++  useEffect(() => {
++    const media = window.matchMedia("(min-width: 768px)");
++    const sync = () => setFineTuneOpen(media.matches);
++    sync();
++    media.addEventListener("change", sync);
++    return () => media.removeEventListener("change", sync);
++  }, []);
++
+   const openPicker = () => {
+     if (!isValidating) {
+       inputRef.current?.click();
+@@ -96,21 +181,233 @@ export function LogoUpload() {
+         onChange={handleInputChange}
+         aria-label="Select a logo file"
+       />
++      <input
++        ref={cameraInputRef}
++        type="file"
++        className="sr-only"
++        accept="image/*"
++        capture="environment"
++        multiple={false}
++        onChange={handleInputChange}
++        aria-label="Take a photo of your logo"
++      />
+ 
+       {logo && status !== "validating" ? (
+-        <div className="logo-preview" aria-live="polite">
+-          <div className="logo-preview-image-wrap">
+-            {/* Object URLs keep the original file browser-local; SVG markup is never injected. */}
+-            {/* eslint-disable-next-line @next/next/no-img-element */}
+-            <img
+-              src={logo.previewUrl}
+-              alt={`Preview of ${logo.filename}`}
+-              className="logo-preview-image"
+-            />
++        <div className="artwork-panel" aria-live="polite">
++          {!simplified || recoveryOnly ? <div className="artwork-panel-heading">
++            <p className="text-eyebrow">Your artwork</p>
++            <h2 id="logo-upload-heading" className="text-card-heading logo-filename">
++              {recoveryOnly
++                ? "We could not prepare this image."
++                : logo.filename}
++            </h2>
++          </div> : null}
++          <div className="artwork-controls">
++            {recoveryOnly ? (
++              <>
++                <Button type="button" onClick={preparation?.requestCrop}>
++                  Select the logo area
++                </Button>
++                <Button type="button" variant="secondary" onClick={openPicker}>
++                  Choose another image
++                </Button>
++              </>
++            ) : approved ? (
++              <div className="approval-success" role="status">
++                <p className="text-card-heading">Your preview is ready.</p>
++                <p className="text-supporting">
++                  Your logo placement has been saved for this proof.
++                </p>
++                <Button type="button" variant="secondary" onClick={onEditPlacement}>
++                  Edit placement
++                </Button>
++              </div>
++            ) : (
++              <>
++            {!simplified && preparation?.outcome?.status === "review-required" ? (
++              <div className="candidate-review">
++                <p className="text-card-heading">Here is the logo we prepared.</p>
++                <p className="text-supporting">
++                  Choose the version that looks best, or adjust the selected area.
++                </p>
++                {preparation.outcome.preparedCandidate ? (
++                  <Button
++                    type="button"
++                    variant={preparation.showOriginal ? "secondary" : "primary"}
++                    onClick={() => preparation.setShowOriginal(false)}
++                  >
++                    {preparation.asset?.preparation.status === "error" &&
++                    preparation.croppedArtwork
++                      ? "Use cropped area"
++                      : "Use prepared artwork"}
++                  </Button>
++                ) : null}
++                <Button
++                  type="button"
++                  variant="secondary"
++                  onClick={preparation.requestCrop}
++                >
++                  Adjust selection
++                </Button>
++                <Button
++                  type="button"
++                  variant="ghost"
++                  onClick={() => preparation.setShowOriginal(true)}
++                >
++                  Use original
++                </Button>
++              </div>
++            ) : !simplified && preparation?.outcome?.status === "failed" ? (
++              <div className="candidate-review">
++                <p className="text-card-heading">We need a little help identifying your logo.</p>
++                <Button type="button" variant="secondary" onClick={preparation.requestCrop}>
++                  Adjust selection
++                </Button>
++              </div>
++            ) : null}
++            {placement && placementLimits && onPlacementChange ? (
++              <>
++              <Button
++                type="button"
++                variant="ghost"
++                className="mobile-reset-placement"
++                onClick={onResetPlacement}
++              >
++                Reset placement
++              </Button>
++              <details
++                className="fine-tune-placement"
++                open={fineTuneOpen}
++                onToggle={(event) => setFineTuneOpen(event.currentTarget.open)}
++              >
++                <summary>Fine-tune placement</summary>
++              <div className="placement-controls">
++                <label className="placement-control">
++                  <span>
++                    Logo size
++                    <output aria-live="polite">
++                      {getSemanticSizeLabel(placement.scale)}
++                    </output>
++                  </span>
++                  <input
++                    type="range"
++                    min={placementLimits.minimumScale}
++                    max={placementLimits.maximumScale}
++                    step="0.01"
++                    value={placement.scale}
++                    onChange={(event) =>
++                      onPlacementChange({
++                        ...placement,
++                        scale: Number(event.target.value),
++                      })
++                    }
++                    aria-valuetext={getSemanticSizeLabel(placement.scale)}
++                  />
++                  <span className="size-scale-labels" aria-hidden="true">
++                    <span>Smaller</span>
++                    <span className="recommended-marker">Recommended</span>
++                    <span>Larger</span>
++                  </span>
++                </label>
++                <fieldset className="position-control">
++                  <legend>Logo position</legend>
++                  <button type="button" className="position-button position-up" aria-label="Move logo up" onClick={() => onMovePlacement?.("up")}>↑</button>
++                  <button type="button" className="position-button position-left" aria-label="Move logo left" onClick={() => onMovePlacement?.("left")}>←</button>
++                  <button type="button" className="position-centre" aria-label="Centre logo" onClick={onCentrePlacement}>Centre</button>
++                  <button type="button" className="position-button position-right" aria-label="Move logo right" onClick={() => onMovePlacement?.("right")}>→</button>
++                  <button type="button" className="position-button position-down" aria-label="Move logo down" onClick={() => onMovePlacement?.("down")}>↓</button>
++                </fieldset>
++                <Button
++                  type="button"
++                  variant="ghost"
++                  className="desktop-reset-placement"
++                  onClick={onResetPlacement}
++                >
++                  Reset placement
++                </Button>
++              </div>
++              </details>
++              </>
++            ) : null}
++            {!simplified && preparation?.asset &&
++            preparation.asset.preparedUrl !== preparation.asset.originalUrl ? (
++              <Button
++                type="button"
++                variant="secondary"
++                onClick={() =>
++                  onArtworkVersionChange?.(!preparation.showOriginal)
++                }
++              >
++                {preparation.showOriginal
++                  ? "Use prepared artwork"
++                  : "Show original background"}
++              </Button>
++            ) : null}
++            {!simplified && preparation?.asset && preparation.outcome?.status === "ready" ? (
++              <Button
++                type="button"
++                variant="ghost"
++                onClick={preparation.requestCrop}
++              >
++                Adjust selection
++              </Button>
++            ) : null}
++            {!hideAssetActions ? (
++              <>
++                <Button type="button" variant="secondary" onClick={openPicker}>
++                  Replace Logo
++                </Button>
++                <Button type="button" variant="ghost" onClick={removeLogo}>
++                  Remove Logo
++                </Button>
++              </>
++            ) : null}
++            {simplified ? (
++              <Button type="button" className="approval-button" onClick={onApprove}>
++                Approve digital proof
++              </Button>
++            ) : null}
++              </>
++            )}
+           </div>
+-          <div className="logo-preview-details">
+-            <p className="text-eyebrow">Logo selected</p>
+-            <h2 id="logo-upload-heading" className="text-card-heading logo-filename">{logo.filename}</h2>
++          {!simplified && !recoveryOnly ? <div className="logo-preview-image-wrap">
++            {preparation?.outcome?.status === "review-required" &&
++            preparation.outcome.preparedCandidate &&
++            preparation.asset ? (
++              <div className="candidate-previews">
++                <figure>
++                  {/* eslint-disable-next-line @next/next/no-img-element */}
++                  <img src={preparation.asset.originalUrl} alt={`Original ${logo.filename}`} />
++                  <figcaption>Original</figcaption>
++                </figure>
++                <figure>
++                  {/* eslint-disable-next-line @next/next/no-img-element */}
++                  <img src={preparation.asset.preparedUrl} alt={`Prepared ${logo.filename}`} />
++                  <figcaption>
++                    {preparation.asset.preparation.status === "error" &&
++                    preparation.croppedArtwork
++                      ? "Cropped"
++                      : "Prepared"}
++                  </figcaption>
++                </figure>
++              </div>
++            ) : (
++              // eslint-disable-next-line @next/next/no-img-element
++              <img
++                src={
++                  preparation?.asset
++                    ? preparation.showOriginal
++                      ? preparation.asset.originalUrl
++                      : preparation.selectedArtworkUrl ??
++                        preparation.asset.preparedUrl
++                    : logo.previewUrl
++                }
++                alt={`${preparation?.showOriginal ? "Original" : "Prepared"} preview of ${logo.filename}`}
++                className="logo-preview-image"
++              />
++            )}
++          </div> : null}
++          {!simplified && !recoveryOnly ? <div className="logo-preview-details">
+             <dl className="logo-metadata">
+               <div><dt>Format</dt><dd>{logo.extension.toUpperCase()}</dd></div>
+               <div><dt>File size</dt><dd>{logo.formattedSize}</dd></div>
+@@ -120,18 +417,16 @@ export function LogoUpload() {
+               </div>
+               <div><dt>Aspect ratio</dt><dd>{formatAspectRatio(logo.aspectRatio)}</dd></div>
+             </dl>
+-            <p className="upload-success" role="status">
+-              Your logo is ready for the next processing stage. It remains in this browser.
++            <p
++              className={`upload-success ${
++                preparation?.asset?.preparation.status === "error" ? "upload-warning" : ""
++              }`}
++              role="status"
++              aria-live="polite"
++            >
++              {artworkStatusMessage(preparation)}
+             </p>
+-            <div className="logo-actions">
+-              <Button type="button" variant="secondary" onClick={openPicker}>
+-                Replace Logo
+-              </Button>
+-              <Button type="button" variant="ghost" onClick={removeLogo}>
+-                Remove Logo
+-              </Button>
+-            </div>
+-          </div>
++          </div> : null}
+         </div>
+       ) : (
+         <div
+@@ -172,18 +467,31 @@ export function LogoUpload() {
+               up to {MAX_LOGO_FILE_SIZE_LABEL}.
+             </p>
+           </div>
+-          <Button
+-            type="button"
+-            variant="secondary"
+-            loading={isValidating}
+-            loadingLabel="Checking"
+-            onClick={(event) => {
+-              event.stopPropagation();
+-              openPicker();
+-            }}
+-          >
+-            {isValidating ? "Checking" : "Browse Files"}
+-          </Button>
++          <div className="upload-choice-actions">
++            <Button
++              type="button"
++              variant="secondary"
++              loading={isValidating}
++              loadingLabel="Checking"
++              onClick={(event) => {
++                event.stopPropagation();
++                openPicker();
++              }}
++            >
++              {isValidating ? "Checking" : "Choose from device"}
++            </Button>
++            <Button
++              type="button"
++              variant="ghost"
++              className="camera-upload-action"
++              onClick={(event) => {
++                event.stopPropagation();
++                cameraInputRef.current?.click();
++              }}
++            >
++              Take a photo
++            </Button>
++          </div>
+         </div>
+       )}
+ 
