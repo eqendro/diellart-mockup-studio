@@ -114,6 +114,46 @@ a {
   border: 0;
 }
 
+.native-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.button-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.upload-debug-panel {
+  margin: 1rem;
+  padding: 0.875rem;
+  border: 1px solid #8a8175;
+  border-radius: 0.75rem;
+  background: #fffdf7;
+  color: #211d19;
+  font: 0.75rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.upload-debug-panel ol { margin: 0.5rem 0 0; padding-left: 1.5rem; }
+.upload-debug-panel li[data-status="error"] { color: #a11b1b; }
+
+.hydration-probe {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #8a8175;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+.hydration-probe output { font-weight: 700; }
+.hydration-probe pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .container {
   width: 100%;
   max-width: var(--content-width);
@@ -845,6 +885,10 @@ a {
   .camera-upload-action { display: inline-flex; }
 }
 
+@media (max-width: 767px) {
+  .camera-upload-action { display: inline-flex; }
+}
+
 @media (max-width: 420px) {
   .header-label { display: none; }
   .upload-dropzone { grid-template-columns: 1fr; text-align: center; }
@@ -861,4 +905,26 @@ a {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+.transparent-preview {
+  background-color: #f7f7f7;
+  background-image:
+    linear-gradient(45deg, #dedede 25%, transparent 25%),
+    linear-gradient(-45deg, #dedede 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #dedede 75%),
+    linear-gradient(-45deg, transparent 75%, #dedede 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.assisted-extraction {
+  grid-column: 1 / -1;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--color-border, #d8d4cc);
+  border-radius: 1rem;
+  background: white;
+}
+
+.colour-sampling-image {
+  cursor: crosshair;
 }

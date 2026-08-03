@@ -6,6 +6,7 @@ export type InternalArtworkPhase =
   | "preparing"
   | "ready"
   | "needs-review"
+  | "reviewing-extraction"
   | "failed";
 
 export type CustomerArtworkState =
@@ -13,6 +14,7 @@ export type CustomerArtworkState =
   | { status: "analysing" }
   | { status: "select-logo-area" }
   | { status: "preparing" }
+  | { status: "review-extraction" }
   | { status: "preview-ready" }
   | {
       status: "error-recoverable";
@@ -36,6 +38,9 @@ export function mapCustomerArtworkState(input: {
     input.processingState === "preparing"
   ) {
     return { status: "preparing" };
+  }
+  if (input.processingState === "reviewing-extraction") {
+    return { status: "review-extraction" };
   }
   if (input.processingState === "failed") {
     return {

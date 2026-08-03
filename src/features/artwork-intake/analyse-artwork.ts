@@ -2,6 +2,7 @@ import { ARTWORK_INTAKE_CONFIG } from "@/features/artwork-intake/config";
 import { analyseArtworkPixels } from "@/features/artwork-intake/analyse-artwork-pixels";
 import type { ArtworkIntakeResult } from "@/features/artwork-intake/types";
 import type { AcceptedLogo } from "@/features/upload/types/logo-upload";
+import { decodeBlobToCanvas } from "@/features/upload/utils/decode-mobile-image";
 
 export async function analyseArtwork(
   logo: AcceptedLogo,
@@ -25,24 +26,21 @@ export async function analyseArtwork(
       },
     };
   }
-  const bitmap = await createImageBitmap(logo.file);
-  try {
+  if (!logo.normalisedBlob) throw new Error("NORMALISED_IMAGE_REQUIRED: analysis cannot decode the original upload.");
+  const decoded = await decodeBlobToCanvas(logo.normalisedBlob);
     const scale = Math.min(
       1,
       ARTWORK_INTAKE_CONFIG.analysisMaxDimension /
-        Math.max(bitmap.width, bitmap.height),
+        Math.max(decoded.width, decoded.height),
     );
-    const width = Math.max(1, Math.round(bitmap.width * scale));
-    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const width = Math.max(1, Math.round(decoded.width * scale));
+    const height = Math.max(1, Math.round(decoded.height * scale));
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("Artwork analysis is unavailable.");
-    context.drawImage(bitmap, 0, 0, width, height);
+    context.drawImage(decoded.canvas, 0, 0, width, height);
     const pixels = context.getImageData(0, 0, width, height);
     return analyseArtworkPixels(pixels);
-  } finally {
-    bitmap.close();
-  }
 }

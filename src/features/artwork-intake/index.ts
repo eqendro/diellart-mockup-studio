@@ -1,5 +1,7 @@
 export { analyseArtwork } from "@/features/artwork-intake/analyse-artwork";
 export { analyseArtworkPixels } from "@/features/artwork-intake/analyse-artwork-pixels";
+export { createExtractedLogo, extractLogoPixels, validateExtractedLogo } from "@/features/artwork-intake/extract-logo";
+export type { ExtractionMode, Rgb } from "@/features/artwork-intake/extract-logo";
 export {
   createCroppedArtwork,
   mapCropToOriginal,

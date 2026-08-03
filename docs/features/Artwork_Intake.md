@@ -120,3 +120,47 @@ devices, “Take a photo” through a camera-enabled input. Captures enter the s
 accepted `File`, intake, crop, and preparation path. Future versions
 may add PDF and EPS conversion, deeper SVG inspection, camera-specific
 heuristics, and optional AI-assisted review. No network processing is used.
+# Mobile photographs and prepared artwork
+
+Artwork intake has two confidence-based paths. Prepared assets (transparent
+PNG/SVG and simple marks on uniform light or dark backgrounds) are normalised,
+analysed, and prepared automatically. Camera photographs, screenshots,
+packaging, labels, and busy documents retain the original upload and enter a
+region-selection plus assisted-separation path.
+
+Raster files are decoded once into an upright, bounded PNG working copy. The
+browser bitmap decoder is preferred and an object-URL-backed HTML image decoder
+is the fallback. Object URLs remain alive until decoding finishes. The working
+copy is limited to 3200 px on its longest side to avoid avoidable mobile memory
+pressure; the original `File` remains separate.
+
+After region selection, customers review extraction on a checkerboard. Both
+dark-on-light and light/colour-on-dark polarity are supported. A crop is never
+considered separated artwork by itself. Filled rectangular masks, near-total
+foreground coverage, and missing foreground are rejected before the renderer,
+leaving a recoverable adjustment path.
+
+This deterministic browser-only workflow does not promise perfect extraction
+from arbitrary photography. Complex imagery deliberately asks for customer
+confirmation instead of silently generating a bad proof.
+
+During local development, append `?debugUpload=1` to display the upload event
+trace on the device itself. It records native control activation, input return,
+captured file metadata, validation, preferred and fallback decoding,
+normalisation, accepted upload state, analysis, routing, and precise internal
+failures. The panel and trace recording are disabled in production builds.
+The development-only `/dev/photo-intake` page also includes a plain native file
+input outside the upload abstraction so Android event delivery can be tested in
+isolation.
+That page also shows a hydration status, interactive React click/text/file
+probes, and early window, promise-rejection, and failed-script diagnostics.
+For a local production-mode comparison, build with `ENABLE_DIAGNOSTICS=1`;
+otherwise the diagnostic route remains unavailable in production.
+
+The canonical raster decoder tries EXIF-aware `createImageBitmap`, retries
+without optional parameters, then uses HTML image loading through an object URL
+and finally a FileReader data URL. A successful `onload` remains usable if
+`img.decode()` rejects. Object URLs are released only after canvas drawing and
+pixel access. Canvas failures retry once at half the configured working size.
+The “Decode this file” diagnostic invokes this exact decoder and reports its
+path, dimensions, browser-orientation result, and first failing stage.

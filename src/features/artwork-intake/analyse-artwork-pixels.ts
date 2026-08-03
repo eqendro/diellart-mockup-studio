@@ -95,6 +95,9 @@ export function analyseArtworkPixels(image: PixelImage): ArtworkIntakeResult {
   const plainLightBorder =
     metrics.borderUniformity >= config.plainBorderUniformity &&
     metrics.borderLightness >= config.plainBorderLightness;
+  const plainDarkBorder =
+    metrics.borderUniformity >= config.plainBorderUniformity &&
+    metrics.borderLightness <= 0.18;
   const slideRatio =
     near(metrics.aspectRatio, 16 / 9, config.slideAspectTolerance) ||
     near(metrics.aspectRatio, 4 / 3, config.slideAspectTolerance);
@@ -146,12 +149,12 @@ export function analyseArtworkPixels(image: PixelImage): ArtworkIntakeResult {
       requiresCrop: true,
     };
   }
-  if (plainLightBorder) {
+  if (plainLightBorder || plainDarkBorder) {
     return {
       classification: "LogoOnPlainBackground",
       confidence: metrics.borderUniformity > 0.92 ? "High" : "Medium",
       recommendedWorkflow: "BackgroundRemoval",
-      reason: "A logo on a plain light background was detected.",
+      reason: `A logo on a plain ${plainDarkBorder ? "dark" : "light"} background was detected.`,
       warnings: [],
       metrics,
       requiresCrop: false,

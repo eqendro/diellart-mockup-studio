@@ -14,6 +14,10 @@ async function upload(page: Page, filename: string) {
 }
 
 async function expectIntrinsicRatio(page: Page) {
+  await expect.poll(() => page.locator(".mockup-logo").evaluate((element) => {
+    const image = element as HTMLImageElement;
+    return image.naturalWidth > 0 && image.naturalHeight > 0;
+  })).toBe(true);
   const geometry = await page.locator(".mockup-logo").evaluate((element) => {
     const image = element as HTMLImageElement;
     const bounds = image.getBoundingClientRect();

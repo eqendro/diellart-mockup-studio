@@ -6,6 +6,7 @@ import type {
   PixelCropCoordinates,
 } from "@/features/artwork-intake/workflow-types";
 import type { AcceptedLogo } from "@/features/upload/types/logo-upload";
+import { decodeBlobToCanvas } from "@/features/upload/utils/decode-mobile-image";
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.max(minimum, Math.min(maximum, value));
@@ -61,8 +62,8 @@ export async function createCroppedArtwork(
   logo: AcceptedLogo,
   selection: CropSelection,
 ): Promise<CroppedArtwork> {
-  const bitmap = await createImageBitmap(logo.file);
-  try {
+  if (!logo.normalisedBlob) throw new Error("NORMALISED_IMAGE_REQUIRED: crop cannot decode the original upload.");
+  const bitmap = await decodeBlobToCanvas(logo.normalisedBlob);
     const coordinates = mapDisplayCropToNatural(
       selection.displayCrop,
       selection.displayedImage,
@@ -75,7 +76,7 @@ export async function createCroppedArtwork(
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Cropping is unavailable.");
     context.drawImage(
-      bitmap,
+      bitmap.canvas,
       coordinates.x,
       coordinates.y,
       coordinates.width,
@@ -106,6 +107,10 @@ export async function createCroppedArtwork(
       height: coordinates.height,
       aspectRatio: coordinates.width / coordinates.height,
       previewUrl: URL.createObjectURL(blob),
+      originalFile: logo.originalFile,
+      normalisedBlob: blob,
+      decoder: logo.decoder,
+      resizedForWorkingCopy: logo.resizedForWorkingCopy,
     };
     if (process.env.NODE_ENV !== "production") {
       console.debug("[artwork-crop]", logo.filename, {
@@ -125,7 +130,4 @@ export async function createCroppedArtwork(
       crop: coordinates,
       objectUrl: croppedLogo.previewUrl,
     };
-  } finally {
-    bitmap.close();
-  }
 }

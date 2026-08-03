@@ -5,6 +5,30 @@ chronological order.
 
 ## Unreleased
 
+- Added a mobile-safe JPEG decode and orientation-normalisation pipeline with
+  `createImageBitmap` and HTML image fallbacks, bounded working dimensions, and
+  preserved originals.
+- Split prepared-artwork and photograph-assisted intake using confidence-based
+  classification, including uniform dark backgrounds.
+- Added post-crop assisted foreground separation, polarity reversal, extracted
+  preview confirmation, and a filled-rectangle renderer safety gate.
+- Replaced customer-blaming decode copy with a recoverable message and added
+  development-only stage diagnostics.
+- Replaced programmatic mobile picker activation with native label-to-input
+  controls for gallery and rear-camera uploads.
+- Added a shared camera/gallery return handler, an immediate reading state,
+  phone-visible upload tracing, and decoder fallbacks throughout downstream
+  artwork stages.
+- Restored standard file-input `change` events as the sole processing trigger,
+  added fixed label associations and a development picker-return watchdog, and
+  added an isolated native diagnostic input for Android testing.
+- Added a development hydration/event probe, early global client-error and
+  failed-resource recorder, and a narrowly scoped Samsung LAN development
+  origin for diagnosing server-rendered pages whose client runtime is absent.
+- Hardened Samsung gallery JPEG decoding with option-free bitmap retry,
+  tolerant HTML image loading, object/data URL fallbacks, reduced-memory canvas
+  retry, exact phone-visible decode stages, and a canonical decoder test panel.
+
 ## v0.9.0 — Artwork Engine Public Preview — 2026-07-30
 
 ### Added

@@ -6,6 +6,7 @@ import type {
 } from "@/features/logo-engine/preparation/process-pixels";
 import type { AcceptedLogo } from "@/features/upload/types/logo-upload";
 import { reportPreparationDiagnostics } from "@/features/logo-engine/preparation/diagnostics";
+import { decodeBlobToCanvas } from "@/features/upload/utils/decode-mobile-image";
 
 export type PreparedArtworkResult = {
   blob: Blob;
@@ -21,8 +22,8 @@ export type PreparedArtworkResult = {
 
 export async function prepareArtwork(logo: AcceptedLogo): Promise<PreparedArtworkResult | null> {
   if (logo.mimeType === "image/svg+xml") return null;
-  const image = await createImageBitmap(logo.file);
-  try {
+  if (!logo.normalisedBlob) throw new Error("NORMALISED_IMAGE_REQUIRED: preparation cannot decode the original upload.");
+  const image = await decodeBlobToCanvas(logo.normalisedBlob);
     const scale = Math.min(
       1,
       ARTWORK_PREPARATION_CONFIG.analysisMaxDimension / Math.max(image.width, image.height),
@@ -34,10 +35,13 @@ export async function prepareArtwork(logo: AcceptedLogo): Promise<PreparedArtwor
     canvas.height = height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("Canvas is unavailable.");
-    context.drawImage(image, 0, 0, width, height);
+    context.drawImage(image.canvas, 0, 0, width, height);
     const source = context.getImageData(0, 0, width, height);
     const prepared = prepareArtworkPixels(source);
     reportPreparationDiagnostics(logo.filename, prepared.diagnostics);
+    if (!prepared.diagnostics.validationPassed) {
+      throw new Error("Prepared output failed the filled-rectangle safety check.");
+    }
     canvas.width = prepared.width;
     canvas.height = prepared.height;
     const output = canvas.getContext("2d");
@@ -58,7 +62,4 @@ export async function prepareArtwork(logo: AcceptedLogo): Promise<PreparedArtwor
       ),
     );
     return { blob, ...prepared };
-  } finally {
-    image.close();
-  }
 }

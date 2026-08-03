@@ -12,6 +12,8 @@ import {
   selectIntakeRoute,
   mapCustomerArtworkState,
   isUsableArtworkCandidate,
+  createExtractedLogo,
+  type ExtractionMode,
 } from "@/features/artwork-intake";
 import { prepareArtwork } from "@/features/logo-engine/preparation/prepare-artwork";
 import {
@@ -31,9 +33,13 @@ export type ArtworkProcessingState =
   | "preparing"
   | "ready"
   | "needs-review"
+  | "reviewing-extraction"
   | "failed";
 
-export function usePreparedArtwork(logo: AcceptedLogo | null) {
+export function usePreparedArtwork(
+  logo: AcceptedLogo | null,
+  recordTrace?: (stage: string, detail?: string, status?: "ok" | "info" | "error") => void,
+) {
   const [asset, setAsset] = useState<ArtworkAsset | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [intakeStatus, setIntakeStatus] = useState<ArtworkIntakeStatus>("idle");
@@ -44,6 +50,8 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
   const [processingState, setProcessingState] =
     useState<ArtworkProcessingState>("idle");
   const [croppedArtwork, setCroppedArtwork] = useState<CroppedArtwork | null>(null);
+  const [extractionMode, setExtractionMode] = useState<ExtractionMode>("dark-on-light");
+  const [extractionMessage, setExtractionMessage] = useState<string | null>(null);
   const preparedUrlRef = useRef<string | null>(null);
   const croppedUrlRef = useRef<string | null>(null);
   const generationRef = useRef(0);
@@ -109,6 +117,7 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
     setOutcome(null);
     setProcessingCrop(false);
     setCroppedArtwork(null);
+    setExtractionMessage(null);
     if (!logo) {
       setAsset(null);
       setIntakeStatus("idle");
@@ -117,16 +126,21 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
       return;
     }
     const base = createProcessingAsset(logo);
+    recordTrace?.("analysis started", logo.filename);
     setAsset(base);
     setIntakeStatus("analysing");
     setProcessingState("analysing");
     setIntakeResult(null);
     void analyseArtwork(logo)
       .then(async (result) => {
-        if (generation !== generationRef.current) return;
+        if (generation !== generationRef.current) {
+          recordTrace?.("processing skipped", "STALE_ANALYSIS_TOKEN", "error");
+          return;
+        }
         setIntakeResult(result);
         setIntakeStatus("complete");
         if (result.classification === "TransparentLogo") {
+          recordTrace?.("resulting route", "automatic preparation: transparent artwork");
           const transparentAsset: ArtworkAsset = {
             ...base,
             preparation: {
@@ -145,6 +159,14 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
           return;
         }
         const route = selectIntakeRoute(result);
+        recordTrace?.(
+          "resulting route",
+          route === "prepare-automatically"
+            ? "automatic preparation"
+            : route === "open-crop"
+              ? "crop or assisted extraction"
+              : "recoverable manual assistance",
+        );
         if (route === "open-crop") {
           setAsset({
             ...base,
@@ -209,8 +231,9 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
           throw new Error("Automatic artwork preparation failed.");
         }
       })
-      .catch(() => {
+      .catch((cause) => {
         if (generation !== generationRef.current) return;
+        recordTrace?.("analysis failed", cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause), "error");
         setIntakeStatus("error");
         setAsset({
           ...base,
@@ -228,7 +251,7 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
       revokeOwnedObjectUrl(preparedUrlRef);
       revokeOwnedObjectUrl(croppedUrlRef);
     };
-  }, [applyPreparation, logo]);
+  }, [applyPreparation, logo, recordTrace]);
 
   const confirmCrop = useCallback(
     async (selection: CropSelection) => {
@@ -273,22 +296,22 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
         await applyPreparation(cropped.logo, base, "medium");
       } catch {
         if (croppedCandidate) {
-          const reviewCandidate = {
-            ...croppedCandidate,
+          // A crop is only a region of interest, never proof-ready artwork.
+          // Keep the last valid asset and route to assisted separation.
+          setAsset({
+            ...createProcessingAsset(logo),
             preparation: {
-              ...croppedCandidate.preparation,
-              status: "error" as const,
-              message: "Preparation failed. You can use the cropped area or adjust it.",
+              ...createProcessingAsset(logo).preparation,
+              status: "error",
+              message: "The logo still needs separating from its background.",
             },
-          };
-          setAsset(reviewCandidate);
+          });
           setOutcome({
             status: "review-required",
             confidence: "low",
-            preparedCandidate: reviewCandidate,
             recommendedAction: "crop",
           });
-          setProcessingState("failed");
+          setProcessingState("needs-review");
         } else {
           setOutcome({ status: "failed", recommendedAction: "crop" });
           setProcessingState("failed");
@@ -309,6 +332,48 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
     if (!usable && intakeResult?.classification !== "TransparentLogo") return null;
     return selectPrintableArtwork(asset, showOriginal);
   }, [asset, intakeResult, showOriginal]);
+
+  const previewExtraction = useCallback(async (
+    mode: ExtractionMode,
+    selected?: readonly [number, number, number],
+  ) => {
+    if (!croppedArtwork) return;
+    setExtractionMode(mode);
+    setExtractionMessage(null);
+    setProcessingState("preparing");
+    const result = await createExtractedLogo(croppedArtwork.logo, mode, selected);
+    if (!result.validation.valid || !result.validation.bounds) {
+      setExtractionMessage(result.validation.reason);
+      setProcessingState("needs-review");
+      return;
+    }
+    const url = URL.createObjectURL(result.blob);
+    revokeOwnedObjectUrl(preparedUrlRef);
+    preparedUrlRef.current = url;
+    const base = createProcessingAsset(logo!);
+    const extractedAsset: ArtworkAsset = {
+      ...base,
+      preparedUrl: url,
+      printableUrl: url,
+      preparedWidth: croppedArtwork.logo.width ?? 1,
+      preparedHeight: croppedArtwork.logo.height ?? 1,
+      foregroundBounds: result.validation.bounds,
+      preparation: {
+        backgroundRemoved: true,
+        marginsCropped: false,
+        backgroundClassification: "transparent",
+        status: "ready",
+      },
+    };
+    setAsset(extractedAsset);
+    setOutcome({
+      status: "review-required",
+      confidence: "medium",
+      preparedCandidate: extractedAsset,
+      recommendedAction: "confirm",
+    });
+    setProcessingState("reviewing-extraction");
+  }, [croppedArtwork, logo]);
   const hasPreparedCandidate = isUsableArtworkCandidate(
     asset,
     intakeResult?.classification,
@@ -373,6 +438,10 @@ export function usePreparedArtwork(logo: AcceptedLogo | null) {
     processingCrop,
     processingState,
     croppedArtwork,
+    extractionMode,
+    extractionMessage,
+    previewExtraction,
+    acceptExtraction: () => setProcessingState("ready"),
     selectedArtworkUrl: printableArtwork?.url ?? null,
     customerState,
     requestCrop: () => {

@@ -13,6 +13,7 @@ import {
 } from "@/features/logo-engine/monochrome/pixels";
 import type { PrintableArtwork } from "@/features/logo-engine/types/artwork";
 import { cleanupResidualNoise } from "@/features/logo-engine/preparation/residual-noise-cleanup";
+import { decodeBlobToCanvas } from "@/features/upload/utils/decode-mobile-image";
 
 type MonochromeSource = {
   artworkUrl: string;
@@ -23,23 +24,15 @@ type MonochromeSource = {
 
 async function decodeArtwork(url: string): Promise<RasterPixels> {
   const blob = await fetch(url).then((response) => response.blob());
-  const bitmap = await createImageBitmap(blob);
-  try {
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
+  const decoded = await decodeBlobToCanvas(blob);
+    const context = decoded.canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("Monochrome canvas is unavailable.");
-    context.drawImage(bitmap, 0, 0);
-    const image = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    const image = context.getImageData(0, 0, decoded.width, decoded.height);
     return {
       data: new Uint8ClampedArray(image.data),
       width: image.width,
       height: image.height,
     };
-  } finally {
-    bitmap.close();
-  }
 }
 
 async function createMonochromeBlob(pixels: RasterPixels, colour: string) {

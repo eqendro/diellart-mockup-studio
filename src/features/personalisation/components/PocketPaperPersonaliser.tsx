@@ -18,6 +18,7 @@ import {
   usePreparedArtwork,
 } from "@/features/logo-engine";
 import { ArtworkCropper } from "@/features/artwork-intake/components/ArtworkCropper";
+import { AssistedExtraction } from "@/features/artwork-intake/components/AssistedExtraction";
 import { LogoUpload } from "@/features/upload/components/LogoUpload";
 import { useLogoUpload } from "@/features/upload/hooks/use-logo-upload";
 import { ProofToolbar } from "@/features/personalisation/components/ProofToolbar";
@@ -38,7 +39,7 @@ const scenePreviews = [
 
 export function PocketPaperPersonaliser() {
   const upload = useLogoUpload();
-  const preparation = usePreparedArtwork(upload.logo);
+  const preparation = usePreparedArtwork(upload.logo, upload.recordTrace);
   const monochrome = useMonochromeArtwork(preparation.printableArtwork);
   const [placement, setPlacement] = useState<ArtworkPlacement>(DEFAULT_PLACEMENT);
   const [interactedArtworkUrl, setInteractedArtworkUrl] = useState<string | null>(
@@ -153,6 +154,20 @@ export function PocketPaperPersonaliser() {
         </div>
       ) : (
         <div ref={workspaceRef} className="container proof-workspace">
+          {preparation.croppedArtwork &&
+          (preparation.customerState.status === "select-logo-area" ||
+            preparation.customerState.status === "review-extraction") ? (
+            <AssistedExtraction
+              cropUrl={preparation.croppedArtwork.objectUrl}
+              extractedUrl={preparation.selectedArtworkUrl}
+              reviewing={preparation.customerState.status === "review-extraction"}
+              mode={preparation.extractionMode}
+              message={preparation.extractionMessage}
+              onMode={(mode) => void preparation.previewExtraction(mode)}
+              onAccept={preparation.acceptExtraction}
+              onAdjust={preparation.requestCrop}
+            />
+          ) : null}
           <section className="proof-main" aria-labelledby="proof-heading">
             <header className="proof-heading">
               <div>
@@ -164,7 +179,8 @@ export function PocketPaperPersonaliser() {
               </div>
               <ProofToolbar upload={upload} />
             </header>
-            {preparation.customerState.status === "select-logo-area" ? (
+            {preparation.customerState.status === "select-logo-area" &&
+            !preparation.croppedArtwork ? (
               <div className="proof-help">
                 <div>
                   <p className="text-card-heading">

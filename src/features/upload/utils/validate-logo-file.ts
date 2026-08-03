@@ -6,8 +6,6 @@ import {
 } from "@/shared/constants/upload";
 import type { ValidationResult } from "@/features/upload/types/logo-upload";
 
-const supportedFormats = "PNG, JPG, JPEG, WebP or SVG";
-
 export function getFileExtension(filename: string): string {
   const lastDot = filename.lastIndexOf(".");
   return lastDot > -1 ? filename.slice(lastDot + 1).toLowerCase() : "";
@@ -32,17 +30,21 @@ export function validateLogoFile(file: File): ValidationResult {
   const hasSupportedMimeType = ACCEPTED_LOGO_MIME_TYPES.includes(
     file.type as (typeof ACCEPTED_LOGO_MIME_TYPES)[number],
   );
+  const hasAndroidImageMime = file.type === "image/jpg" || file.type === "image/*";
   const hasSupportedExtension = ACCEPTED_LOGO_EXTENSIONS.includes(
     extension as (typeof ACCEPTED_LOGO_EXTENSIONS)[number],
   );
 
-  if (!hasSupportedMimeType || !hasSupportedExtension) {
-    return {
-      valid: false,
-      message: `This file type is not supported. Upload a ${supportedFormats} file.`,
-    };
+  // Android camera/gallery providers may omit the extension or MIME type.
+  // Accept when either trustworthy browser signal identifies a supported image.
+  if (!hasSupportedMimeType && !hasAndroidImageMime && !hasSupportedExtension) {
+    // Android content providers may return a useful non-empty image with both
+    // metadata fields missing. The canonical decoder is the final authority.
+    return { valid: true, extension: extension || "image" };
   }
 
-  return { valid: true, extension };
+  const resolvedExtension = hasSupportedExtension
+    ? extension
+    : file.type === "image/jpeg" || file.type === "image/jpg" ? "jpg" : file.type.split("/")[1] ?? extension;
+  return { valid: true, extension: resolvedExtension };
 }
-
