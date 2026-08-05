@@ -13,6 +13,7 @@ import {
   mapCustomerArtworkState,
   isUsableArtworkCandidate,
   createExtractedLogo,
+  createExtractionCandidates,
   type ExtractionMode,
 } from "@/features/artwork-intake";
 import { prepareArtwork } from "@/features/logo-engine/preparation/prepare-artwork";
@@ -52,8 +53,12 @@ export function usePreparedArtwork(
   const [croppedArtwork, setCroppedArtwork] = useState<CroppedArtwork | null>(null);
   const [extractionMode, setExtractionMode] = useState<ExtractionMode>("dark-on-light");
   const [extractionMessage, setExtractionMessage] = useState<string | null>(null);
+  const [extractionCandidates, setExtractionCandidates] = useState<Array<{
+    id: ExtractionMode; url: string; blob: Blob; bounds: { x: number; y: number; width: number; height: number };
+  }>>([]);
   const preparedUrlRef = useRef<string | null>(null);
   const croppedUrlRef = useRef<string | null>(null);
+  const candidateUrlsRef = useRef<string[]>([]);
   const generationRef = useRef(0);
 
   const applyPreparation = useCallback(
@@ -78,6 +83,9 @@ export function usePreparedArtwork(
         });
         setProcessingState("ready");
         return unchanged;
+      }
+      if (!result.backgroundRemoved) {
+        throw new Error("No clean foreground separation was produced.");
       }
       const preparedUrl = URL.createObjectURL(result.blob);
       revokeOwnedObjectUrl(preparedUrlRef);
@@ -110,6 +118,8 @@ export function usePreparedArtwork(
     const generation = ++generationRef.current;
     revokeOwnedObjectUrl(preparedUrlRef);
     revokeOwnedObjectUrl(croppedUrlRef);
+    candidateUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    candidateUrlsRef.current = [];
     // A new source invalidates every derived candidate and selection.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowOriginal(false);
@@ -118,6 +128,7 @@ export function usePreparedArtwork(
     setProcessingCrop(false);
     setCroppedArtwork(null);
     setExtractionMessage(null);
+    setExtractionCandidates([]);
     if (!logo) {
       setAsset(null);
       setIntakeStatus("idle");
@@ -187,19 +198,8 @@ export function usePreparedArtwork(
           return;
         }
         if (route === "manual-review") {
-          setAsset({
-            ...base,
-            preparation: {
-              ...base.preparation,
-              status: "ready",
-              message: "We need a little help identifying your logo.",
-            },
-          });
-          setOutcome({
-            status: "review-required",
-            confidence: "low",
-            recommendedAction: "crop",
-          });
+          setAsset({ ...base, preparation: { ...base.preparation, status: "ready", message: "Select the area that contains your logo." } });
+          setOutcome({ status: "review-required", confidence: "low", recommendedAction: "crop" });
           setProcessingState("selecting");
           return;
         }
@@ -250,6 +250,8 @@ export function usePreparedArtwork(
       generationRef.current = generation + 1;
       revokeOwnedObjectUrl(preparedUrlRef);
       revokeOwnedObjectUrl(croppedUrlRef);
+      candidateUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      candidateUrlsRef.current = [];
     };
   }, [applyPreparation, logo, recordTrace]);
 
@@ -293,7 +295,20 @@ export function usePreparedArtwork(
         setAsset(croppedCandidate);
         setShowOriginal(false);
         setProcessingState("preparing");
-        await applyPreparation(cropped.logo, base, "medium");
+        const candidates = await createExtractionCandidates(cropped.logo);
+        if (generation !== generationRef.current) return;
+        candidateUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        const visualCandidates = candidates.map((candidate) => ({
+          id: candidate.id,
+          url: URL.createObjectURL(candidate.blob),
+          blob: candidate.blob,
+          bounds: candidate.validation.bounds!,
+        }));
+        candidateUrlsRef.current = visualCandidates.map((candidate) => candidate.url);
+        setExtractionCandidates(visualCandidates);
+        setExtractionMessage(visualCandidates.length ? null : "We could not separate the logo cleanly. Try selecting a tighter area.");
+        setAsset(createProcessingAsset(logo));
+        setProcessingState("reviewing-extraction");
       } catch {
         if (croppedCandidate) {
           // A crop is only a region of interest, never proof-ready artwork.
@@ -320,7 +335,7 @@ export function usePreparedArtwork(
         if (generation === generationRef.current) setProcessingCrop(false);
       }
     },
-    [applyPreparation, logo],
+    [logo],
   );
 
   const printableArtwork = useMemo<PrintableArtwork | null>(() => {
@@ -440,8 +455,23 @@ export function usePreparedArtwork(
     croppedArtwork,
     extractionMode,
     extractionMessage,
+    extractionCandidates,
     previewExtraction,
-    acceptExtraction: () => setProcessingState("ready"),
+    acceptExtraction: (id?: string) => {
+      const selected = extractionCandidates.find((candidate) => candidate.id === id) ?? extractionCandidates[0];
+      if (!selected || !logo || !croppedArtwork) return;
+      const base = createProcessingAsset(logo);
+      setAsset({
+        ...base,
+        preparedUrl: selected.url,
+        printableUrl: selected.url,
+        preparedWidth: croppedArtwork.logo.width ?? 1,
+        preparedHeight: croppedArtwork.logo.height ?? 1,
+        foregroundBounds: selected.bounds,
+        preparation: { backgroundRemoved: true, marginsCropped: false, backgroundClassification: "transparent", status: "ready" },
+      });
+      setProcessingState("ready");
+    },
     selectedArtworkUrl: printableArtwork?.url ?? null,
     customerState,
     requestCrop: () => {

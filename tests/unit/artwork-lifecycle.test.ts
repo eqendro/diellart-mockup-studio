@@ -9,6 +9,10 @@ import type { AcceptedLogo } from "../../src/features/upload/types/logo-upload";
 
 const logo = {
   file: new File(["logo"], "brand.png", { type: "image/png" }),
+  sessionId: "test-session",
+  source: "file-manager" as const,
+  ownedBytes: new ArrayBuffer(4),
+  ownedBlob: new Blob(["logo"], { type: "image/png" }),
   filename: "brand.png",
   mimeType: "image/png",
   extension: "png",

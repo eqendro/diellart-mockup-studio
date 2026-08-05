@@ -9,7 +9,12 @@ export type UploadStatus =
   | "error";
 
 export type AcceptedLogo = {
+  /** Application-owned file facade; never the picker/provider-backed File. */
   file: File;
+  sessionId: string;
+  source: UploadSource;
+  ownedBytes: ArrayBuffer;
+  ownedBlob: Blob;
   filename: string;
   mimeType: string;
   extension: string;
@@ -19,10 +24,9 @@ export type AcceptedLogo = {
   height: number | null;
   aspectRatio: number | null;
   previewUrl: string;
-  originalFile?: File;
   normalisedBlob?: Blob;
   decoder?: DecoderPath | "svg";
-  orientation?: "browser-decoded";
+  orientation?: 1 | 3 | 6 | 8 | "browser-decoded";
   resizedForWorkingCopy?: boolean;
 };
 
@@ -30,7 +34,7 @@ export type ValidationResult =
   | { valid: true; extension: string }
   | { valid: false; message: string };
 
-export type UploadSource = "gallery" | "camera" | "drop";
+export type UploadSource = "gallery" | "file-manager" | "camera" | "drop";
 export type UploadTraceEntry = {
   id: number;
   stage: string;

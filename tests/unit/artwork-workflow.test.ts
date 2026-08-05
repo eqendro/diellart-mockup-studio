@@ -27,6 +27,10 @@ async function fixture(filename: string): Promise<PixelImage> {
 
 const logo = {
   file: new File(["logo"], "logo.png", { type: "image/png" }),
+  sessionId: "test-session",
+  source: "file-manager" as const,
+  ownedBytes: new ArrayBuffer(4),
+  ownedBlob: new Blob(["logo"], { type: "image/png" }),
   filename: "logo.png",
   mimeType: "image/png",
   extension: "png",

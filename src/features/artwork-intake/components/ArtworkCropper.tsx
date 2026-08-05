@@ -37,7 +37,7 @@ export function ArtworkCropper({
         <p className="text-eyebrow">Artwork selection</p>
         <h3 id="crop-heading" className="text-section-heading">Select your logo</h3>
         <p className="text-supporting">
-          Adjust the box so it contains only your logo.
+          Adjust the box so it contains only the logo.
         </p>
       </header>
       <div className="crop-canvas">
@@ -99,13 +99,13 @@ export function ArtworkCropper({
           loading={busy}
           loadingLabel="Preparing"
         >
-          Use this area
+          Continue
         </Button>
         <Button type="button" variant="secondary" onClick={reset} disabled={busy}>
           Reset
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel} disabled={busy}>
-          Cancel
+          Choose another image
         </Button>
       </div>
     </section>

@@ -158,14 +158,11 @@ export function PocketPaperPersonaliser() {
           (preparation.customerState.status === "select-logo-area" ||
             preparation.customerState.status === "review-extraction") ? (
             <AssistedExtraction
-              cropUrl={preparation.croppedArtwork.objectUrl}
-              extractedUrl={preparation.selectedArtworkUrl}
-              reviewing={preparation.customerState.status === "review-extraction"}
-              mode={preparation.extractionMode}
+              candidates={preparation.extractionCandidates}
               message={preparation.extractionMessage}
-              onMode={(mode) => void preparation.previewExtraction(mode)}
               onAccept={preparation.acceptExtraction}
               onAdjust={preparation.requestCrop}
+              onReplace={upload.removeLogo}
             />
           ) : null}
           <section className="proof-main" aria-labelledby="proof-heading">

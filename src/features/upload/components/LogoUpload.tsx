@@ -101,7 +101,7 @@ export function LogoUpload({
   const [fineTuneOpen, setFineTuneOpen] = useState(false);
   const showUploadDebug = useSyncExternalStore(
     () => () => undefined,
-    () => process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).get("debugUpload") === "1",
+    () => new URLSearchParams(window.location.search).get("debugUpload") === "1",
     () => false,
   );
   const {
@@ -569,9 +569,11 @@ export function LogoUpload({
         <div className="upload-error" role="alert">
           <div>
             <strong>
-              {isReplacementError
-                ? "Replacement logo not accepted"
-                : "Logo not accepted"}
+              {status === "error" && error?.startsWith("We could not read")
+                ? "File unreadable"
+                : isReplacementError
+                  ? "Could not replace image"
+                  : "Could not use image"}
             </strong>
             <p>
               {error}

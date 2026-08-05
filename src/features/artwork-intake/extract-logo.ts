@@ -4,6 +4,7 @@ import { decodeBlobToCanvas } from "@/features/upload/utils/decode-mobile-image"
 
 export type ExtractionMode = "dark-on-light" | "light-on-dark" | "selected-colour" | "selected-background";
 export type Rgb = readonly [number, number, number];
+export type CandidateValidation = ReturnType<typeof validateExtractedLogo>;
 
 const distance = (data: Uint8ClampedArray, offset: number, colour: Rgb) =>
   Math.hypot(data[offset] - colour[0], data[offset + 1] - colour[1], data[offset + 2] - colour[2]);
@@ -28,20 +29,61 @@ export function extractLogoPixels(
 
 export function validateExtractedLogo(image: PixelImage) {
   let foreground = 0;
+  let edgeForeground = 0;
+  let minAlpha = 255;
+  let maxAlpha = 0;
   for (let offset = 3; offset < image.data.length; offset += 4) {
-    if (image.data[offset] > 20) foreground++;
+    const alpha = image.data[offset];
+    minAlpha = Math.min(minAlpha, alpha);
+    maxAlpha = Math.max(maxAlpha, alpha);
+    if (alpha > 20) {
+      foreground++;
+      const pixel = (offset - 3) / 4;
+      const x = pixel % image.width;
+      const y = Math.floor(pixel / image.width);
+      if (x === 0 || y === 0 || x === image.width - 1 || y === image.height - 1) edgeForeground++;
+    }
   }
   const foregroundRatio = foreground / (image.width * image.height);
+  const transparencyRatio = 1 - foregroundRatio;
   const bounds = detectForegroundBounds(image, 20);
   const boundsRatio = bounds ? (bounds.width * bounds.height) / (image.width * image.height) : 0;
-  const valid = Boolean(bounds) && foregroundRatio >= 0.002 && foregroundRatio < 0.88 &&
-    !(foregroundRatio > 0.72 && boundsRatio > 0.94);
+  const perimeter = Math.max(1, image.width * 2 + image.height * 2 - 4);
+  const edgeContact = edgeForeground / perimeter;
+  const opaqueField = foregroundRatio > 0.72 && boundsRatio > 0.94;
+  const almostAllEdges = edgeContact > 0.82 && boundsRatio > 0.94;
+  const empty = foregroundRatio < 0.002 || maxAlpha <= 20;
+  const noInternalVariation = minAlpha > 245;
+  const valid = Boolean(bounds) && !empty && transparencyRatio > 0.12 &&
+    !opaqueField && !almostAllEdges && !(noInternalVariation && boundsRatio > 0.9);
   return {
     valid,
     foregroundRatio,
+    transparencyRatio,
+    edgeContact,
+    boundsRatio,
     bounds,
-    reason: valid ? null : "The selected area still looks like a filled rectangle.",
+    reason: valid ? null : "We could not separate the logo cleanly. Try selecting a tighter area.",
   };
+}
+
+export type ExtractionCandidate = {
+  id: ExtractionMode;
+  blob: Blob;
+  validation: CandidateValidation;
+  confidence: number;
+};
+
+export async function createExtractionCandidates(logo: AcceptedLogo): Promise<ExtractionCandidate[]> {
+  const modes: ExtractionMode[] = ["dark-on-light", "light-on-dark", "selected-background"];
+  const results = await Promise.all(modes.map(async (mode) => {
+    const result = await createExtractedLogo(logo, mode, mode === "selected-background" ? [255, 255, 255] : undefined);
+    const confidence = result.validation.valid
+      ? (1 - Math.abs(result.validation.foregroundRatio - 0.22)) - result.validation.edgeContact * 0.5
+      : -1;
+    return { id: mode, ...result, confidence };
+  }));
+  return results.filter((candidate) => candidate.validation.valid).sort((a, b) => b.confidence - a.confidence).slice(0, 3);
 }
 
 export async function createExtractedLogo(
