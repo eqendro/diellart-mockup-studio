@@ -14,11 +14,11 @@ import { formatAspectRatio } from "@/features/upload/utils/file-metadata";
 import type { useLogoUpload } from "@/features/upload/hooks/use-logo-upload";
 import type { ReturnTypeOfPreparedArtwork } from "@/features/logo-engine/types/internal";
 import {
-  getSemanticSizeLabel,
   type ArtworkPlacement,
   type PlacementDirection,
   type PlacementLimits,
 } from "@/features/mockup-engine/placement";
+import { ArtworkPrecisionControls } from "@/features/personalisation/components/ArtworkPrecisionControls";
 import {
   LOGO_FILE_INPUT_ACCEPT,
   MAX_LOGO_FILE_SIZE_LABEL,
@@ -35,6 +35,8 @@ type LogoUploadProps = {
   placementLimits?: PlacementLimits;
   onMovePlacement?: (direction: PlacementDirection) => void;
   onCentrePlacement?: () => void;
+  onResizePlacement?: (direction: "increase" | "decrease") => void;
+  onRotatePlacement?: (direction: "clockwise" | "anticlockwise") => void;
   simplified?: boolean;
   recoveryOnly?: boolean;
   approved?: boolean;
@@ -85,6 +87,8 @@ export function LogoUpload({
   placementLimits,
   onMovePlacement,
   onCentrePlacement,
+  onResizePlacement,
+  onRotatePlacement,
   simplified = false,
   recoveryOnly = false,
   approved = false,
@@ -97,6 +101,7 @@ export function LogoUpload({
   const galleryInputId = "gallery-logo-input";
   const cameraInputId = "camera-logo-input";
   const pendingPickerRef = useRef<{ source: "gallery" | "camera"; openedAt: number; changeReceived: boolean } | null>(null);
+  const pickerWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragDepthRef = useRef(0);
   const [fineTuneOpen, setFineTuneOpen] = useState(false);
   const showUploadDebug = useSyncExternalStore(
@@ -108,6 +113,7 @@ export function LogoUpload({
     status,
     logo,
     error,
+    errorCode,
     selectFiles,
     processSelectedArtworkFile,
     rejectFiles,
@@ -120,6 +126,7 @@ export function LogoUpload({
 
   const isValidating = status === "reading" || status === "validating";
   const isReplacementError = Boolean(error && logo);
+  const isProviderRecovery = errorCode === "android-provider-file-unreadable";
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 768px)");
@@ -131,30 +138,47 @@ export function LogoUpload({
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
-    const checkPickerReturn = () => {
+    const cancelWatchdog = () => {
+      if (pickerWatchdogRef.current) clearTimeout(pickerWatchdogRef.current);
+      pickerWatchdogRef.current = null;
+    };
+    const schedulePickerCheck = () => {
       const pending = pendingPickerRef.current;
       if (!pending || pending.changeReceived || document.visibilityState !== "visible") return;
-      if (Date.now() - pending.openedAt < 500) return;
-      recordTrace(
-        "picker returned without change",
-        `${pending.source}: Picker returned, but no file change event was received.`,
-        "error",
-      );
-      pendingPickerRef.current = null;
+      cancelWatchdog();
+      pickerWatchdogRef.current = setTimeout(() => {
+        const current = pendingPickerRef.current;
+        if (!current || current !== pending || current.changeReceived) return;
+        recordTrace(
+          "picker returned without change",
+          `${current.source}: Picker returned, but no file change event was received.`,
+          "info",
+        );
+        pendingPickerRef.current = null;
+        pickerWatchdogRef.current = null;
+      }, 1500);
     };
-    document.addEventListener("visibilitychange", checkPickerReturn);
-    window.addEventListener("focus", checkPickerReturn);
+    document.addEventListener("visibilitychange", schedulePickerCheck);
+    window.addEventListener("focus", schedulePickerCheck);
     return () => {
-      document.removeEventListener("visibilitychange", checkPickerReturn);
-      window.removeEventListener("focus", checkPickerReturn);
+      cancelWatchdog();
+      document.removeEventListener("visibilitychange", schedulePickerCheck);
+      window.removeEventListener("focus", schedulePickerCheck);
     };
   }, [recordTrace]);
+
+  const clearPendingPicker = () => {
+    if (pickerWatchdogRef.current) clearTimeout(pickerWatchdogRef.current);
+    pickerWatchdogRef.current = null;
+    pendingPickerRef.current = null;
+  };
 
   const reportNativeActivation = (
     kind: "gallery" | "camera",
     input: HTMLInputElement | null,
   ) => {
     if (process.env.NODE_ENV === "production") return;
+    clearPendingPicker();
     pendingPickerRef.current = { source: kind, openedAt: Date.now(), changeReceived: false };
     recordTrace(`${kind} control activated`, input ? `input ${input.id} exists` : "INPUT_MISSING", input ? "ok" : "error");
     console.debug("[native-upload-control]", {
@@ -168,10 +192,14 @@ export function LogoUpload({
   };
 
   const handleFileSelection = (event: ChangeEvent<HTMLInputElement>, source: UploadSource) => {
+    const eventStartedAt = performance.now();
+    const diagnosticsEnabled = process.env.NODE_ENV !== "production" && showUploadDebug;
     const input = event.currentTarget;
     if (pendingPickerRef.current) pendingPickerRef.current.changeReceived = true;
+    clearPendingPicker();
     recordTrace("native picker returned", source);
     recordTrace("change event fired", input.id);
+    if (diagnosticsEnabled) recordTrace("native event handler entered", "+0.000ms");
     recordTrace("event target file count", String(input.files?.length ?? 0));
     // Capture the File objects before clearing the control. Android content
     // provider data must never be read from the event after an async boundary.
@@ -182,9 +210,34 @@ export function LogoUpload({
       return;
     }
     recordTrace("file captured", source);
+    if (diagnosticsEnabled) {
+      recordTrace("File obtained from event.currentTarget.files", `+${(performance.now() - eventStartedAt).toFixed(3)}ms`);
+    }
     recordTrace("file metadata", `${file.name || "(no name)"}; ${file.type || "(no MIME)"}; ${file.size} bytes; ${file.lastModified}`);
-    input.value = "";
-    recordTrace("input reset", "after File capture");
+    if (diagnosticsEnabled) {
+      const prototype = Object.getPrototypeOf(file) as { constructor?: { name?: string } } | null;
+      recordTrace("File identity at event", `+${(performance.now() - eventStartedAt).toFixed(3)}ms; ${JSON.stringify({
+        sameObject: true,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+        constructorName: file.constructor?.name ?? "(unknown)",
+        instanceofFile: file instanceof File,
+        instanceofBlob: file instanceof Blob,
+        prototypeConstructor: prototype?.constructor?.name ?? "(null)",
+        prototypeIsFilePrototype: prototype === File.prototype,
+        extensible: Object.isExtensible(file),
+      })}`);
+      recordTrace("metadata read", `+${(performance.now() - eventStartedAt).toFixed(3)}ms`);
+      recordTrace(
+        "lastModified near selection",
+        String(Math.abs(Date.now() - file.lastModified) <= 120_000),
+        "info",
+      );
+      recordTrace("provider source note", `${source}; Android picker provider identity is not exposed by the File API`, "info");
+    }
+    recordTrace("native input retained", input.isConnected ? input.id : "INPUT_NOT_MOUNTED", input.isConnected ? "ok" : "error");
     if (process.env.NODE_ENV !== "production") {
       console.debug("[native-upload-change]", {
         inputId: input.id,
@@ -197,8 +250,78 @@ export function LogoUpload({
         })),
       });
     }
-    void processSelectedArtworkFile(file, source);
+    void processSelectedArtworkFile(file, source, (ownershipSucceeded) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.assert(
+          input.value !== "",
+          "Native input was reset before owned-byte acquisition reached a terminal state.",
+        );
+      }
+      input.value = "";
+      recordTrace("input reset after ownership", ownershipSucceeded ? "success" : "terminal failure");
+      recordTrace("native reference released", input.id);
+    }, diagnosticsEnabled ? { eventStartedAt, originalFile: file } : undefined);
   };
+
+  const openStoredFilePicker = async (recovery = false) => {
+    if (recovery) recordTrace("recovery action selected", "Choose through Files", "info");
+    const picker = (window as typeof window & {
+      showOpenFilePicker?: (options?: {
+        multiple?: boolean;
+        types?: Array<{ description: string; accept: Record<string, string[]> }>;
+      }) => Promise<Array<{ getFile(): Promise<File> }>>;
+    }).showOpenFilePicker;
+    if (!recovery || typeof picker !== "function") {
+      recordTrace("picker route", "stored-file-input", "info");
+      reportNativeActivation("gallery", inputRef.current);
+      inputRef.current?.click();
+      return;
+    }
+    recordTrace("picker route", "showOpenFilePicker", "info");
+    try {
+      const [handle] = await picker({
+        multiple: false,
+        types: [{
+          description: "Logo images",
+          accept: {
+            "image/png": [".png"],
+            "image/jpeg": [".jpg", ".jpeg"],
+            "image/webp": [".webp"],
+            "image/svg+xml": [".svg"],
+          },
+        }],
+      });
+      if (handle) await selectFiles([await handle.getFile()], "file-manager");
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "AbortError") return;
+      recordTrace("picker route fallback", cause instanceof Error ? cause.message : String(cause), "info");
+      reportNativeActivation("gallery", inputRef.current);
+      inputRef.current?.click();
+    }
+  };
+
+  const openCameraPicker = (recovery = false) => {
+    if (recovery) recordTrace("recovery action selected", "Take a photo instead", "info");
+    recordTrace("picker route", "camera-input", "info");
+    reportNativeActivation("camera", cameraInputRef.current);
+    cameraInputRef.current?.click();
+  };
+
+  const handlePickerCancel = () => {
+    clearPendingPicker();
+    recordTrace("picker cancelled", "native cancel event", "info");
+  };
+
+  useEffect(() => {
+    const gallery = inputRef.current;
+    const camera = cameraInputRef.current;
+    gallery?.addEventListener("cancel", handlePickerCancel);
+    camera?.addEventListener("cancel", handlePickerCancel);
+    return () => {
+      gallery?.removeEventListener("cancel", handlePickerCancel);
+      camera?.removeEventListener("cancel", handlePickerCancel);
+    };
+  });
 
   const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -354,51 +477,13 @@ export function LogoUpload({
                 onToggle={(event) => setFineTuneOpen(event.currentTarget.open)}
               >
                 <summary>Fine-tune placement</summary>
-              <div className="placement-controls">
-                <label className="placement-control">
-                  <span>
-                    Logo size
-                    <output aria-live="polite">
-                      {getSemanticSizeLabel(placement.scale)}
-                    </output>
-                  </span>
-                  <input
-                    type="range"
-                    min={placementLimits.minimumScale}
-                    max={placementLimits.maximumScale}
-                    step="0.01"
-                    value={placement.scale}
-                    onChange={(event) =>
-                      onPlacementChange({
-                        ...placement,
-                        scale: Number(event.target.value),
-                      })
-                    }
-                    aria-valuetext={getSemanticSizeLabel(placement.scale)}
-                  />
-                  <span className="size-scale-labels" aria-hidden="true">
-                    <span>Smaller</span>
-                    <span className="recommended-marker">Recommended</span>
-                    <span>Larger</span>
-                  </span>
-                </label>
-                <fieldset className="position-control">
-                  <legend>Logo position</legend>
-                  <button type="button" className="position-button position-up" aria-label="Move logo up" onClick={() => onMovePlacement?.("up")}>↑</button>
-                  <button type="button" className="position-button position-left" aria-label="Move logo left" onClick={() => onMovePlacement?.("left")}>←</button>
-                  <button type="button" className="position-centre" aria-label="Centre logo" onClick={onCentrePlacement}>Centre</button>
-                  <button type="button" className="position-button position-right" aria-label="Move logo right" onClick={() => onMovePlacement?.("right")}>→</button>
-                  <button type="button" className="position-button position-down" aria-label="Move logo down" onClick={() => onMovePlacement?.("down")}>↓</button>
-                </fieldset>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="desktop-reset-placement"
-                  onClick={onResetPlacement}
-                >
-                  Reset placement
-                </Button>
-              </div>
+              <ArtworkPrecisionControls
+                onMove={(direction) => onMovePlacement?.(direction)}
+                onResize={(direction) => onResizePlacement?.(direction)}
+                onRotate={(direction) => onRotatePlacement?.(direction)}
+                onCentre={() => onCentrePlacement?.()}
+                onReset={() => onResetPlacement?.()}
+              />
               </details>
               </>
             ) : null}
@@ -544,32 +629,36 @@ export function LogoUpload({
             </p>
           </div>
           <div className="upload-choice-actions">
-            <label
-              htmlFor={galleryInputId}
-              className={`button button-secondary button-medium ${
+            <button
+              type="button"
+              className={`button button-secondary button-medium stored-file-upload-action ${
                 isValidating ? "button-disabled" : ""
               }`}
+              disabled={isValidating}
               aria-disabled={isValidating}
-              onClick={() => reportNativeActivation("gallery", inputRef.current)}
+              onClick={() => void openStoredFilePicker()}
             >
-              {status === "reading" ? "Reading your image…" : isValidating ? "Checking" : "Choose from device"}
-            </label>
-            <label
-              htmlFor={cameraInputId}
+              {status === "reading" ? "Reading your image…" : isValidating ? "Checking" : "Choose logo file"}
+            </button>
+            <p className="stored-file-upload-help">Select the original image from Files, Downloads or your saved folders.</p>
+            <button
+              type="button"
               className="button button-ghost button-medium camera-upload-action"
-              onClick={() => reportNativeActivation("camera", cameraInputRef.current)}
+              onClick={() => openCameraPicker()}
             >
               Take a photo
-            </label>
+            </button>
           </div>
         </div>
       )}
 
       {error ? (
-        <div className="upload-error" role="alert">
+        <div className={`upload-error ${isProviderRecovery ? "upload-provider-recovery" : ""}`} role="alert">
           <div>
             <strong>
-              {status === "error" && error?.startsWith("We could not read")
+              {isProviderRecovery
+                ? "This photo could not be opened"
+                : errorCode === "file-unreadable"
                 ? "File unreadable"
                 : isReplacementError
                   ? "Could not replace image"
@@ -580,9 +669,20 @@ export function LogoUpload({
               {isReplacementError ? " Your previous logo has been kept." : ""}
             </p>
           </div>
-          <Button type="button" variant="ghost" size="small" onClick={dismissError}>
-            Dismiss
-          </Button>
+          {isProviderRecovery ? (
+            <div className="upload-recovery-actions">
+              <Button type="button" size="small" onClick={() => void openStoredFilePicker(true)}>
+                Choose through Files
+              </Button>
+              <Button type="button" variant="secondary" size="small" onClick={() => openCameraPicker(true)}>
+                Take a photo instead
+              </Button>
+            </div>
+          ) : (
+            <Button type="button" variant="ghost" size="small" onClick={dismissError}>
+              Dismiss
+            </Button>
+          )}
         </div>
       ) : null}
       {showUploadDebug ? (

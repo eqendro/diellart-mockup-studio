@@ -13,12 +13,16 @@ type Props = {
 };
 
 export function AssistedExtraction({ candidates, message, onAccept, onAdjust, onReplace }: Props) {
+  const hasCandidates = candidates.length > 0;
   return (
     <section className="assisted-extraction" aria-labelledby="choose-result-heading">
       <header>
-        <h3 id="choose-result-heading" className="text-section-heading">Choose the best result</h3>
+        <h3 id="choose-result-heading" className="text-section-heading">
+          {hasCandidates ? "Choose the best result" : "We need a tighter selection"}
+        </h3>
+        {!hasCandidates ? <p className="text-supporting">Adjust the box so it contains the logo with as little background as possible.</p> : null}
       </header>
-      {candidates.length ? (
+      {hasCandidates ? (
         <div className="candidate-previews">
           {candidates.map((candidate) => (
             <article className="transparent-preview" key={candidate.id}>
@@ -28,9 +32,9 @@ export function AssistedExtraction({ candidates, message, onAccept, onAdjust, on
             </article>
           ))}
         </div>
-      ) : <p className="upload-warning" role="status">{message ?? "We could not separate the logo cleanly. Try selecting a tighter area."}</p>}
+      ) : message ? <p className="upload-warning" role="status">{message}</p> : null}
       <div className="crop-actions">
-        <Button type="button" variant="ghost" onClick={onAdjust}>Adjust selection</Button>
+        <Button type="button" variant={hasCandidates ? "ghost" : "primary"} onClick={onAdjust}>Adjust selection</Button>
         <Button type="button" variant="secondary" onClick={onReplace}>Choose another image</Button>
       </div>
     </section>

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import ReactCrop, { type PercentCrop } from "react-image-crop";
 import { Button } from "@/components/ui/Button";
 import type { CropSelection } from "@/features/artwork-intake/workflow-types";
+import { suggestArtworkCrop } from "@/features/artwork-intake/suggest-crop";
 
 const initialCrop: PercentCrop = {
   unit: "%",
@@ -30,6 +31,7 @@ export function ArtworkCropper({
 }: ArtworkCropperProps) {
   const [crop, setCrop] = useState<PercentCrop>(initialCrop);
   const imageRef = useRef<HTMLImageElement>(null);
+  const suggestionAppliedRef = useRef(false);
   const reset = () => setCrop(initialCrop);
   return (
     <section className="crop-workflow" aria-labelledby="crop-heading">
@@ -65,6 +67,26 @@ export function ArtworkCropper({
             ref={imageRef}
             src={imageUrl}
             alt={`Select the logo area in ${filename}`}
+            onLoad={(event) => {
+              if (suggestionAppliedRef.current) return;
+              suggestionAppliedRef.current = true;
+              const image = event.currentTarget;
+              const scale = Math.min(1, 320 / Math.max(image.naturalWidth, image.naturalHeight));
+              const width = Math.max(1, Math.round(image.naturalWidth * scale));
+              const height = Math.max(1, Math.round(image.naturalHeight * scale));
+              const canvas = document.createElement("canvas");
+              canvas.width = width;
+              canvas.height = height;
+              const context = canvas.getContext("2d", { willReadFrequently: true });
+              if (!context) return;
+              try {
+                context.drawImage(image, 0, 0, width, height);
+                const suggestion = suggestArtworkCrop(context.getImageData(0, 0, width, height).data, width, height);
+                if (suggestion) setCrop({ unit: "%", ...suggestion });
+              } catch {
+                // Keep the neutral starting crop if the browser blocks canvas sampling.
+              }
+            }}
           />
         </ReactCrop>
       </div>

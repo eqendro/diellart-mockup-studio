@@ -2,6 +2,7 @@ export type ArtworkPlacement = {
   scale: number;
   offsetX: number;
   offsetY: number;
+  rotation: number;
 };
 
 export type PlacementLimits = {

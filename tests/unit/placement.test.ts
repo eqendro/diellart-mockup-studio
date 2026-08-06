@@ -13,15 +13,15 @@ import { pocketPaperProductView } from "../../src/config/products/pocket-paper";
 
 describe("artwork placement", () => {
   it("starts with the recommended fit centred", () => {
-    expect(DEFAULT_PLACEMENT).toEqual({ scale: 0.88, offsetX: 0, offsetY: 0 });
+    expect(DEFAULT_PLACEMENT).toEqual({ scale: 0.88, offsetX: 0, offsetY: 0, rotation: 0 });
     expect(getSemanticSizeLabel(DEFAULT_PLACEMENT.scale)).toBe("Recommended");
   });
 
   it("clamps scale to the configured safe minimum and maximum", () => {
-    expect(clampPlacement({ scale: 0, offsetX: 0, offsetY: 0 }).scale).toBe(
+    expect(clampPlacement({ scale: 0, offsetX: 0, offsetY: 0, rotation: 0 }).scale).toBe(
       PLACEMENT_SCALE_LIMITS.minimum,
     );
-    expect(clampPlacement({ scale: 2, offsetX: 0, offsetY: 0 }).scale).toBe(
+    expect(clampPlacement({ scale: 2, offsetX: 0, offsetY: 0, rotation: 0 }).scale).toBe(
       PLACEMENT_SCALE_LIMITS.maximum,
     );
   });
@@ -37,10 +37,11 @@ describe("artwork placement", () => {
   });
 
   it("clamps both offsets to the current scale's travel", () => {
-    expect(clampPlacement({ scale: 0.5, offsetX: 1, offsetY: -1 })).toEqual({
+    expect(clampPlacement({ scale: 0.5, offsetX: 1, offsetY: -1, rotation: 0 })).toEqual({
       scale: 0.5,
       offsetX: 0.5,
       offsetY: -0.5,
+      rotation: 0,
     });
   });
 
@@ -68,10 +69,11 @@ describe("artwork placement", () => {
   });
 
   it("centres offsets without changing the selected size", () => {
-    expect(centrePlacement({ scale: 0.6, offsetX: 0.2, offsetY: -0.1 })).toEqual({
+    expect(centrePlacement({ scale: 0.6, offsetX: 0.2, offsetY: -0.1, rotation: 12 })).toEqual({
       scale: 0.6,
       offsetX: 0,
       offsetY: 0,
+      rotation: 12,
     });
   });
 

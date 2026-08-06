@@ -5,6 +5,7 @@ export const REGRESSION_FIXTURES = [
   { name: "raffaello.jpg", mimeType: "image/jpeg", runs: 10 },
   { name: "ristorante-di-mare.jpg", mimeType: "image/jpeg", runs: 10 },
   { name: "vodafone.jpg", mimeType: "image/jpeg", runs: 10 },
+  { name: "riviera-di-mare.jpg", mimeType: "image/jpeg", runs: 10 },
 ] as const;
 
 export type RegressionFixtureName = (typeof REGRESSION_FIXTURES)[number]["name"];

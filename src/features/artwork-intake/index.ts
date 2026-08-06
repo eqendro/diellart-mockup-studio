@@ -2,6 +2,7 @@ export { analyseArtwork } from "@/features/artwork-intake/analyse-artwork";
 export { analyseArtworkPixels } from "@/features/artwork-intake/analyse-artwork-pixels";
 export { createExtractedLogo, createExtractionCandidates, extractLogoPixels, validateExtractedLogo } from "@/features/artwork-intake/extract-logo";
 export type { ExtractionCandidate, ExtractionMode, Rgb } from "@/features/artwork-intake/extract-logo";
+export { createAllExtractionCandidates } from "@/features/artwork-intake/extract-logo";
 export {
   createCroppedArtwork,
   mapCropToOriginal,

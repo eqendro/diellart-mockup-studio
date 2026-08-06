@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
   useEffect,
   useMemo,
   useRef,
@@ -14,8 +16,11 @@ import type { ArtworkPlacement } from "@/features/mockup-engine/placement";
 import {
   applyGestureDelta,
   calculatePinchPlacement,
+  pointerAngle,
   pointerDistance,
   pointerMidpoint,
+  resizePlacement,
+  rotatePlacement,
   type Point,
 } from "@/features/mockup-engine/placement";
 import { calculateLogoFit } from "@/features/mockup-engine/utils/calculate-logo-fit";
@@ -41,6 +46,7 @@ type GestureStart =
   | {
       type: "pinch";
       distance: number;
+      angle: number;
       midpoint: Point;
       placement: ArtworkPlacement;
       moved: boolean;
@@ -57,7 +63,7 @@ export function MockupRenderer({
   const stageRef = useRef<HTMLDivElement>(null);
   const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
   const [interactivePlacement, setInteractivePlacement] = useState(placement);
-  const [interactionMode, setInteractionMode] = useState<"idle" | "drag" | "pinch">("idle");
+  const [interactionMode, setInteractionMode] = useState<"idle" | "drag" | "pinch" | "rotate">("idle");
   const placementRef = useRef(placement);
   const pointersRef = useRef(new Map<number, Point & { pointerType: string }>());
   const gestureRef = useRef<GestureStart | null>(null);
@@ -147,6 +153,7 @@ export function MockupRenderer({
     gestureRef.current = {
       type: "pinch",
       distance: pointerDistance(points[0], points[1]),
+      angle: pointerAngle(points[0], points[1]),
       midpoint: pointerMidpoint(points[0], points[1]),
       placement: placementRef.current,
       moved: false,
@@ -205,6 +212,8 @@ export function MockupRenderer({
           placement: gesture.placement,
           initialDistance: gesture.distance,
           currentDistance: pointerDistance(points[0], points[1]),
+          initialAngle: gesture.angle,
+          currentAngle: pointerAngle(points[0], points[1]),
           midpointDeltaX: midpoint.x - gesture.midpoint.x,
           midpointDeltaY: midpoint.y - gesture.midpoint.y,
           safeWidth: size.width,
@@ -286,6 +295,43 @@ export function MockupRenderer({
     height: `${(1 - mockup.surface.safeMargins.vertical * 2) * 100}%`,
   };
 
+  const placementGeometry = artwork
+    ? { mockup, artworkAspectRatio: artwork.aspectRatio }
+    : null;
+
+  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!placementGeometry || !onPlacementCommit) return;
+    event.preventDefault();
+    const direction = event.deltaY < 0 ? "increase" : "decrease";
+    const next = resizePlacement(placementRef.current, direction, placementGeometry);
+    schedulePlacement(next);
+    onPlacementCommit(next);
+    onInteractionComplete?.("mouse");
+  };
+
+  const rotateFromPoint = (clientX: number, clientY: number) => {
+    if (!artworkGeometry || !placementGeometry) return;
+    const bounds = stageRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const centreX = bounds.left + artworkGeometry.left + artworkGeometry.width / 2;
+    const centreY = bounds.top + artworkGeometry.top + artworkGeometry.height / 2;
+    const angle = (Math.atan2(clientY - centreY, clientX - centreX) * 180) / Math.PI + 90;
+    schedulePlacement(rotatePlacement(placementRef.current, angle, placementGeometry));
+  };
+
+  const handleRotationKey = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (!placementGeometry || !onPlacementCommit) return;
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next = rotatePlacement(
+      placementRef.current,
+      placementRef.current.rotation + (event.key === "ArrowRight" ? 2 : -2),
+      placementGeometry,
+    );
+    schedulePlacement(next);
+    onPlacementCommit(next);
+  };
+
   return (
     <div
       className="mockup-stage"
@@ -300,6 +346,8 @@ export function MockupRenderer({
       data-placement-scale={interactivePlacement.scale}
       data-placement-offset-x={interactivePlacement.offsetX}
       data-placement-offset-y={interactivePlacement.offsetY}
+      data-placement-rotation={interactivePlacement.rotation}
+      onWheel={handleWheel}
     >
       <Image
         src={mockup.imagePath}
@@ -378,6 +426,7 @@ export function MockupRenderer({
             top: artworkGeometry.top,
             width: artworkGeometry.width,
             height: "auto",
+            transform: `rotate(${interactivePlacement.rotation}deg)`,
             mixBlendMode: artwork.veryLight
               ? mockup.renderingProfile.lightArtworkBlendMode
               : mockup.renderingProfile.blendMode,
@@ -397,6 +446,42 @@ export function MockupRenderer({
             }px)`,
           }}
         />
+      ) : null}
+      {artwork && artworkGeometry && onPlacementCommit ? (
+        <button
+          type="button"
+          className="artwork-rotation-handle"
+          aria-label="Rotate artwork"
+          title="Drag to rotate artwork"
+          style={{
+            left: artworkGeometry.left + artworkGeometry.width / 2,
+            top: artworkGeometry.top,
+          }}
+          onKeyDown={handleRotationKey}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            } catch {
+              // Synthetic browser tests do not create a native active-pointer record.
+            }
+            setInteractionMode("rotate");
+            rotateFromPoint(event.clientX, event.clientY);
+          }}
+          onPointerMove={(event) => {
+            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+            rotateFromPoint(event.clientX, event.clientY);
+          }}
+          onPointerUp={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+            setInteractionMode("idle");
+            onPlacementCommit(placementRef.current);
+            onInteractionComplete?.(event.pointerType);
+          }}
+          onPointerCancel={() => setInteractionMode("idle")}
+        >
+          <span aria-hidden="true" />
+        </button>
       ) : null}
       {SHOW_MOCKUP_DEBUG_OVERLAY ? (
         <>

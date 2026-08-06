@@ -68,6 +68,32 @@ test("desktop mouse drag moves the logo and Centre restores its position", async
     .toEqual(beforePosition);
 });
 
+test("desktop wheel zoom and keyboard-accessible rotation handle edit artwork", async ({ page }) => {
+  await openPreparedProof(page);
+  const logo = page.locator(".mockup-logo");
+  const before = await logo.boundingBox();
+  await logo.hover();
+  await page.mouse.wheel(0, -120);
+  await expect.poll(async () => (await logo.boundingBox())!.width).toBeGreaterThan(before!.width);
+
+  const handle = page.getByRole("button", { name: "Rotate artwork", exact: true });
+  await expect(handle).toBeVisible();
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".mockup-stage")).toHaveAttribute("data-placement-rotation", "2");
+});
+
+test("precision buttons nudge, resize, and rotate without modifier keys", async ({ page }) => {
+  await openPreparedProof(page);
+  await page.getByRole("button", { name: "Move logo right" }).click();
+  await expect.poll(() => page.locator(".mockup-stage").getAttribute("data-placement-offset-x"))
+    .not.toBe("0");
+  await page.getByRole("button", { name: "Make artwork smaller" }).click();
+  await expect(page.locator(".mockup-stage")).not.toHaveAttribute("data-placement-scale", "0.88");
+  await page.getByRole("button", { name: "Rotate artwork clockwise" }).click();
+  await expect(page.locator(".mockup-stage")).toHaveAttribute("data-placement-rotation", "2");
+});
+
 test("two touch pointers resize without leaving stale gesture state", async ({
   page,
 }) => {

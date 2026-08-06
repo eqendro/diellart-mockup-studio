@@ -11,3 +11,5 @@ These files are used to test the real DiellArt artwork-intake pipeline.
 | aureva.png | Accepted consistently, light background removed, gold/beige logo preserved, upright |
 | raffaello.jpg | Accepted consistently, red lettering isolated, upright, minimal background remnants |
 | ristorante-di-mare.jpg | Must not render the full rectangular photograph; should either isolate the logo or route to assisted selection |
+| vodafone.jpg | Confirmed crop produces a transparent red-logo candidate and routes to review |
+| riviera-di-mare.jpg | Reasonably tight crop preserves the wordmark/details, removes the photographed field, and routes to review |

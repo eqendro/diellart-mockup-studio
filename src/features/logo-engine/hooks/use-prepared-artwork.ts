@@ -24,6 +24,7 @@ import {
 } from "@/features/logo-engine/preparation/artwork-state";
 import type { ArtworkAsset, PrintableArtwork } from "@/features/logo-engine/types/artwork";
 import type { AcceptedLogo } from "@/features/upload/types/logo-upload";
+import { planCandidateReview } from "@/features/artwork-intake/candidate-review";
 
 export type ArtworkIntakeStatus = "idle" | "analysing" | "complete" | "error";
 export type ArtworkProcessingState =
@@ -54,7 +55,7 @@ export function usePreparedArtwork(
   const [extractionMode, setExtractionMode] = useState<ExtractionMode>("dark-on-light");
   const [extractionMessage, setExtractionMessage] = useState<string | null>(null);
   const [extractionCandidates, setExtractionCandidates] = useState<Array<{
-    id: ExtractionMode; url: string; blob: Blob; bounds: { x: number; y: number; width: number; height: number };
+    id: ExtractionMode; url: string; blob: Blob; bounds: { x: number; y: number; width: number; height: number }; confidence: number;
   }>>([]);
   const preparedUrlRef = useRef<string | null>(null);
   const croppedUrlRef = useRef<string | null>(null);
@@ -151,7 +152,7 @@ export function usePreparedArtwork(
         setIntakeResult(result);
         setIntakeStatus("complete");
         if (result.classification === "TransparentLogo") {
-          recordTrace?.("resulting route", "automatic preparation: transparent artwork");
+          recordTrace?.("final route", "automatic preparation: transparent artwork");
           const transparentAsset: ArtworkAsset = {
             ...base,
             preparation: {
@@ -171,7 +172,7 @@ export function usePreparedArtwork(
         }
         const route = selectIntakeRoute(result);
         recordTrace?.(
-          "resulting route",
+          "final route",
           route === "prepare-automatically"
             ? "automatic preparation"
             : route === "open-crop"
@@ -303,12 +304,37 @@ export function usePreparedArtwork(
           url: URL.createObjectURL(candidate.blob),
           blob: candidate.blob,
           bounds: candidate.validation.bounds!,
+          confidence: candidate.confidence,
         }));
         candidateUrlsRef.current = visualCandidates.map((candidate) => candidate.url);
-        setExtractionCandidates(visualCandidates);
-        setExtractionMessage(visualCandidates.length ? null : "We could not separate the logo cleanly. Try selecting a tighter area.");
-        setAsset(createProcessingAsset(logo));
-        setProcessingState("reviewing-extraction");
+        const reviewPlan = planCandidateReview(
+          visualCandidates,
+          new URLSearchParams(window.location.search).get("debugUpload") === "1",
+        );
+        if (reviewPlan.mode === "auto-select") {
+          const selected = reviewPlan.candidates[0];
+          setExtractionCandidates([]);
+          setExtractionMessage(null);
+          setAsset({
+            ...createProcessingAsset(logo),
+            preparedUrl: selected.url,
+            printableUrl: selected.url,
+            preparedWidth: cropped.logo.width ?? 1,
+            preparedHeight: cropped.logo.height ?? 1,
+            foregroundBounds: selected.bounds,
+            preparation: { backgroundRemoved: true, marginsCropped: false, backgroundClassification: "transparent", status: "ready" },
+          });
+          setProcessingState("ready");
+        } else {
+          setExtractionCandidates(reviewPlan.candidates);
+          setExtractionMessage(
+            reviewPlan.mode === "tighter-selection"
+              ? "We could not separate the logo confidently. Try selecting a tighter area."
+              : null,
+          );
+          setAsset(createProcessingAsset(logo));
+          setProcessingState("reviewing-extraction");
+        }
       } catch {
         if (croppedCandidate) {
           // A crop is only a region of interest, never proof-ready artwork.

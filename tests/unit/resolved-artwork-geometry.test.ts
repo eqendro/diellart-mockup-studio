@@ -23,7 +23,7 @@ describe("resolved artwork geometry", () => {
     const resolved = resolveArtworkGeometry(
       { x: 50, y: 70, width: 200, height: 100 },
       artwork(width, height),
-      { scale: 0.88, offsetX: 0.1, offsetY: -0.1 },
+      { scale: 0.88, offsetX: 0.1, offsetY: -0.1, rotation: 0 },
     );
     expect(resolved.width / resolved.height).toBeCloseTo(width / height, 12);
     expect(resolved.scale).toBe(0.88);
@@ -36,7 +36,7 @@ describe("resolved artwork geometry", () => {
       // Deliberately inconsistent fit height proves it cannot create scaleY.
       { x: 50, y: 70, width: 200, height: 75 },
       artwork(220, 80),
-      { scale: 0.7, offsetX: 0, offsetY: 0 },
+      { scale: 0.7, offsetX: 0, offsetY: 0, rotation: 0 },
     );
     expect(resolved.width).toBe(440);
     expect(resolved.height).toBe(160);

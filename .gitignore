@@ -28,3 +28,6 @@ next-env.d.ts
 # Vercel
 .vercel
 
+# Physical-device QA evidence (keep the directory placeholder only)
+/test-results/physical-samsung/*
+!/test-results/physical-samsung/.gitkeep

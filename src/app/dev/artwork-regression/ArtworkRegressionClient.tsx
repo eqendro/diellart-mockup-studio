@@ -85,6 +85,31 @@ export default function ArtworkRegressionClient() {
                     ))}
                   </div>
 
+                  {run.visuals.cropUrl ? (
+                    <section>
+                      <h3>Post-crop extraction comparison</h3>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                        <figure style={{ margin: 0 }}>
+                          <div style={{ minHeight: 150, display: "grid", placeItems: "center", background: "#f3f3f3" }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={run.visuals.cropUrl} alt={`Selected crop ${fixture.name}`} style={{ maxWidth: "100%", maxHeight: 240 }} />
+                          </div>
+                          <figcaption>Selected crop</figcaption>
+                        </figure>
+                        {run.visuals.hypotheses?.map((hypothesis, index) => (
+                          <figure key={hypothesis.id} style={{ margin: 0 }}>
+                            <div style={{ minHeight: 150, display: "grid", placeItems: "center", background: "repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0/20px 20px" }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={hypothesis.url} alt={`Extraction candidate ${index + 1} ${fixture.name}`} style={{ maxWidth: "100%", maxHeight: 240 }} />
+                            </div>
+                            <figcaption>Candidate {index + 1}: {hypothesis.validation.valid ? "valid" : `rejected — ${(hypothesis.validation.rejectionReasons as string[]).join(", ")}`}</figcaption>
+                            <details><summary>Metrics</summary><pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify({ confidence: hypothesis.confidence, validation: hypothesis.validation, input: hypothesis.inputMetrics }, null, 2)}</pre></details>
+                          </figure>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
                   <dl>
                     <dt>Decode</dt><dd>{run.result.decodeStatus}</dd>
                     <dt>Orientation</dt><dd>{run.result.orientation.method ?? "unknown"}; {run.result.orientation.original ?? "?"} → {run.result.orientation.output ?? "?"}; normalised: {String(run.result.orientation.normalised)}; aspect preserved: {String(run.result.orientation.aspectPreserved)}</dd>

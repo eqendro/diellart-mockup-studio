@@ -11,6 +11,8 @@ import {
   DEFAULT_PLACEMENT,
   resetPlacement,
   movePlacement,
+  resizePlacement,
+  rotatePlacement,
   type ArtworkPlacement,
 } from "@/features/mockup-engine/placement";
 import {
@@ -55,6 +57,7 @@ export function PocketPaperPersonaliser() {
     ? calculatePlacementLimits(placement.scale, {
         mockup: pocketPaperProductView,
         artworkAspectRatio: preparation.printableArtwork.aspectRatio,
+        rotation: placement.rotation,
       })
     : calculatePlacementLimits(placement.scale);
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -128,6 +131,7 @@ export function PocketPaperPersonaliser() {
       ? calculatePlacementLimits(next.scale, {
           mockup: pocketPaperProductView,
           artworkAspectRatio: preparation.printableArtwork.aspectRatio,
+          rotation: next.rotation,
         })
       : calculatePlacementLimits(next.scale);
     setPlacement(clampPlacement(next, limits));
@@ -165,6 +169,7 @@ export function PocketPaperPersonaliser() {
               onReplace={upload.removeLogo}
             />
           ) : null}
+          {!(preparation.customerState.status === "review-extraction" && preparation.extractionCandidates.length === 0) ? (
           <section className="proof-main" aria-labelledby="proof-heading">
             <header className="proof-heading">
               <div>
@@ -259,6 +264,7 @@ export function PocketPaperPersonaliser() {
               Final production artwork will be professionally prepared before printing.
             </p>
           </section>
+          ) : null}
           {preparation.customerState.status === "preview-ready" ? (
           <aside
             className="proof-sidebar"
@@ -286,9 +292,30 @@ export function PocketPaperPersonaliser() {
               placementLimits={placementLimits}
               onPlacementChange={updatePlacement}
               onMovePlacement={(direction) =>
-                setPlacement((current) =>
-                  movePlacement(current, direction, placementLimits),
-                )
+                setPlacement((current) => {
+                  const limits = calculatePlacementLimits(current.scale, {
+                    mockup: pocketPaperProductView,
+                    artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
+                    rotation: current.rotation,
+                  });
+                  return movePlacement(current, direction, limits);
+                })
+              }
+              onResizePlacement={(direction) =>
+                setPlacement((current) => resizePlacement(current, direction, {
+                  mockup: pocketPaperProductView,
+                  artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
+                }))
+              }
+              onRotatePlacement={(direction) =>
+                setPlacement((current) => rotatePlacement(
+                  current,
+                  current.rotation + (direction === "clockwise" ? 2 : -2),
+                  {
+                    mockup: pocketPaperProductView,
+                    artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
+                  },
+                ))
               }
               onCentrePlacement={() =>
                 setPlacement((current) => centrePlacement(current))

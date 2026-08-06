@@ -18,7 +18,7 @@ describe("placement gestures", () => {
   it("converts pointer pixels into normalized safe-area offsets", () => {
     const next = applyGestureDelta({
       ...geometry,
-      placement: { scale: 0.5, offsetX: 0, offsetY: 0 },
+      placement: { scale: 0.5, offsetX: 0, offsetY: 0, rotation: 0 },
       deltaX: 40,
       deltaY: -60,
     });
@@ -27,7 +27,7 @@ describe("placement gestures", () => {
   });
 
   it("clamps drag movement to the geometry limits", () => {
-    const placement = { scale: 0.5, offsetX: 0, offsetY: 0 };
+    const placement = { scale: 0.5, offsetX: 0, offsetY: 0, rotation: 0 };
     const next = applyGestureDelta({
       ...geometry,
       placement,
@@ -42,7 +42,7 @@ describe("placement gestures", () => {
   it("enlarges and reduces by the pinch-distance ratio", () => {
     const enlarged = calculatePinchPlacement({
       ...geometry,
-      placement: { scale: 0.5, offsetX: 0, offsetY: 0 },
+      placement: { scale: 0.5, offsetX: 0, offsetY: 0, rotation: 0 },
       initialDistance: 100,
       currentDistance: 150,
       midpointDeltaX: 0,
@@ -84,7 +84,7 @@ describe("placement gestures", () => {
   it("reclamps position after pinch scaling and follows its midpoint", () => {
     const next = calculatePinchPlacement({
       ...geometry,
-      placement: { scale: 0.5, offsetX: 0.4, offsetY: -0.4 },
+      placement: { scale: 0.5, offsetX: 0.4, offsetY: -0.4, rotation: 0 },
       initialDistance: 100,
       currentDistance: 200,
       midpointDeltaX: 40,
@@ -93,5 +93,26 @@ describe("placement gestures", () => {
     const limits = calculatePlacementLimits(next.scale, geometry);
     expect(next.offsetX).toBeLessThanOrEqual(limits.maximumOffsetX);
     expect(next.offsetY).toBeGreaterThanOrEqual(limits.minimumOffsetY);
+  });
+
+  it("rotates continuously during a two-pointer pinch", () => {
+    const next = calculatePinchPlacement({
+      ...geometry,
+      placement: { scale: 0.5, offsetX: 0, offsetY: 0, rotation: 10 },
+      initialDistance: 100,
+      currentDistance: 100,
+      midpointDeltaX: 0,
+      midpointDeltaY: 0,
+      initialAngle: 170,
+      currentAngle: -170,
+    });
+    expect(next.rotation).toBeCloseTo(30);
+  });
+
+  it("tightens safe movement limits when rotation enlarges the visual bounds", () => {
+    const unrotated = calculatePlacementLimits(0.5, geometry);
+    const rotated = calculatePlacementLimits(0.5, { ...geometry, rotation: 45 });
+    expect(rotated.maximumOffsetX).toBeLessThanOrEqual(unrotated.maximumOffsetX);
+    expect(rotated.maximumOffsetY).toBeLessThanOrEqual(unrotated.maximumOffsetY);
   });
 });

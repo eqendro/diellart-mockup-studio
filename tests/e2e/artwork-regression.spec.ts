@@ -22,6 +22,7 @@ const fixtures = [
   ["raffaello.jpg", 10],
   ["ristorante-di-mare.jpg", 10],
   ["vodafone.jpg", 10],
+  ["riviera-di-mare.jpg", 10],
 ] as const;
 
 async function readResult(page: import("@playwright/test").Page, name: string) {
@@ -57,6 +58,14 @@ test("real fixture matrix records production-pipeline outcomes and renderer safe
       (ristorante.candidateValidation?.valid && (ristorante.candidateValidation.rectangularity ?? 1) < 0.9),
     "Ristorante must not hand the full rectangular photo to the renderer",
   ).toBeTruthy();
+  for (const name of ["vodafone.jpg", "riviera-di-mare.jpg"] as const) {
+    const result = results[name];
+    expect(result.candidateValidation?.valid, `${name} must produce a valid post-crop candidate`).toBe(true);
+    expect(result.candidateValidation?.transparencyRatio ?? 0, `${name} must remove the photographed field`).toBeGreaterThan(0.35);
+    expect(result.candidateValidation?.rectangularity ?? 1, `${name} must not produce a solid rectangle`).toBeLessThan(0.8);
+    expect(result.finalCustomerState, `${name} must enter candidate review`).toBe("review-extraction");
+    expect(result.rendererAllowed, `${name} must not bypass review`).toBe(false);
+  }
 });
 
 test("all real fixtures remain deterministic for the required repeated runs without URL leakage", async ({ page }) => {

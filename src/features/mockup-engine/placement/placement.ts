@@ -9,6 +9,7 @@ export const DEFAULT_PLACEMENT: ArtworkPlacement = {
   scale: 0.88,
   offsetX: 0,
   offsetY: 0,
+  rotation: 0,
 };
 
 export const PLACEMENT_SCALE_LIMITS = {
@@ -16,6 +17,8 @@ export const PLACEMENT_SCALE_LIMITS = {
   maximum: 1,
   recommended: 0.88,
   movementStepRatio: 0.12,
+  scaleStep: 0.04,
+  rotationStep: 2,
 } as const;
 
 const clamp = (value: number, minimum: number, maximum: number) =>
@@ -23,7 +26,7 @@ const clamp = (value: number, minimum: number, maximum: number) =>
 
 export function calculatePlacementLimits(
   scale: number,
-  geometry?: { mockup: ProductMockup; artworkAspectRatio: number },
+  geometry?: { mockup: ProductMockup; artworkAspectRatio: number; rotation?: number },
 ): PlacementLimits {
   const safeScale = clamp(
     scale,
@@ -55,8 +58,11 @@ export function calculatePlacementLimits(
       geometry.mockup.surface.height *
       (1 - geometry.mockup.surface.safeMargins.vertical * 2) *
       height;
-    horizontalTravel = safeWidth > 0 ? (safeWidth - fit.width) / 2 / safeWidth : 0;
-    verticalTravel = safeHeight > 0 ? (safeHeight - fit.height) / 2 / safeHeight : 0;
+    const radians = ((geometry.rotation ?? 0) * Math.PI) / 180;
+    const rotatedWidth = Math.abs(fit.width * Math.cos(radians)) + Math.abs(fit.height * Math.sin(radians));
+    const rotatedHeight = Math.abs(fit.width * Math.sin(radians)) + Math.abs(fit.height * Math.cos(radians));
+    horizontalTravel = safeWidth > 0 ? Math.max(0, (safeWidth - rotatedWidth) / 2 / safeWidth) : 0;
+    verticalTravel = safeHeight > 0 ? Math.max(0, (safeHeight - rotatedHeight) / 2 / safeHeight) : 0;
   }
   return {
     minimumScale: PLACEMENT_SCALE_LIMITS.minimum,
@@ -76,6 +82,7 @@ export function clampPlacement(
     scale: clamp(placement.scale, limits.minimumScale, limits.maximumScale),
     offsetX: clamp(placement.offsetX, limits.minimumOffsetX, limits.maximumOffsetX),
     offsetY: clamp(placement.offsetY, limits.minimumOffsetY, limits.maximumOffsetY),
+    rotation: placement.rotation,
   };
 }
 
@@ -117,4 +124,32 @@ export function movePlacement(
 
 export function centrePlacement(placement: ArtworkPlacement): ArtworkPlacement {
   return { ...placement, offsetX: 0, offsetY: 0 };
+}
+
+export function resizePlacement(
+  placement: ArtworkPlacement,
+  direction: "increase" | "decrease",
+  geometry: { mockup: ProductMockup; artworkAspectRatio: number },
+): ArtworkPlacement {
+  const scale = clamp(
+    placement.scale + (direction === "increase" ? PLACEMENT_SCALE_LIMITS.scaleStep : -PLACEMENT_SCALE_LIMITS.scaleStep),
+    PLACEMENT_SCALE_LIMITS.minimum,
+    PLACEMENT_SCALE_LIMITS.maximum,
+  );
+  return clampPlacement(
+    { ...placement, scale },
+    calculatePlacementLimits(scale, { ...geometry, rotation: placement.rotation }),
+  );
+}
+
+export function rotatePlacement(
+  placement: ArtworkPlacement,
+  rotation: number,
+  geometry: { mockup: ProductMockup; artworkAspectRatio: number },
+): ArtworkPlacement {
+  const normalised = ((rotation + 180) % 360 + 360) % 360 - 180;
+  return clampPlacement(
+    { ...placement, rotation: normalised },
+    calculatePlacementLimits(placement.scale, { ...geometry, rotation: normalised }),
+  );
 }

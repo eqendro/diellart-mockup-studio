@@ -35,6 +35,11 @@ export type ValidationResult =
   | { valid: false; message: string };
 
 export type UploadSource = "gallery" | "file-manager" | "camera" | "drop";
+export type UploadErrorCode =
+  | "android-provider-file-unreadable"
+  | "file-unreadable"
+  | "invalid-image"
+  | "validation";
 export type UploadTraceEntry = {
   id: number;
   stage: string;

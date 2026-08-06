@@ -1,4 +1,4 @@
-import { analyseArtwork, mapCustomerArtworkState, selectIntakeRoute } from "@/features/artwork-intake";
+import { analyseArtwork, createAllExtractionCandidates, createCroppedArtwork, mapCustomerArtworkState, selectIntakeRoute } from "@/features/artwork-intake";
 import type { ArtworkIntakeMetrics, ArtworkClassification } from "@/features/artwork-intake";
 import { createMonochromePixels, detectDominantBrandColour } from "@/features/logo-engine/monochrome/pixels";
 import { prepareArtwork } from "@/features/logo-engine/preparation/prepare-artwork";
@@ -42,6 +42,14 @@ export type ArtworkRegressionVisuals = {
   normalisedUrl: string | null;
   candidateUrl: string | null;
   monochromeUrl: string | null;
+  cropUrl?: string | null;
+  hypotheses?: Array<{
+    id: string;
+    url: string;
+    confidence: number;
+    validation: Record<string, unknown>;
+    inputMetrics: Record<string, unknown>;
+  }>;
 };
 
 export type ArtworkRegressionRun = {
@@ -153,6 +161,12 @@ function expectedFailures(
   } else if (fixtureName === "raffaello.jpg") {
     if (!input.preparation?.backgroundRemoved) reasons.push("Raffaello red logo was not isolated from the background.");
     if (!validation?.valid || rectangle) reasons.push("Raffaello candidate remains a rectangular crop.");
+  } else if (fixtureName === "vodafone.jpg" || fixtureName === "riviera-di-mare.jpg") {
+    if (!validation?.valid) reasons.push(`${fixtureName} produced no structurally valid post-crop candidate.`);
+    if ((validation?.transparencyRatio ?? 0) < 0.35) reasons.push(`${fixtureName} retained too much photographed background.`);
+    if ((validation?.rectangularity ?? 1) > 0.8) reasons.push(`${fixtureName} produced a rectangular field.`);
+    if (input.finalCustomerState !== "review-extraction") reasons.push(`${fixtureName} did not route the uncertain crop to candidate review.`);
+    if (input.rendererAllowed) reasons.push(`${fixtureName} bypassed review and reached the renderer.`);
   } else {
     const safelyAssisted = input.finalCustomerState === "select-logo-area" || input.finalCustomerState === "review-extraction";
     if (input.rendererAllowed && rectangle) reasons.push("Ristorante full photograph reached renderer handoff.");
@@ -219,9 +233,61 @@ export async function runArtworkRegressionFixture(
     let candidateUrl: string | null = null;
     let backgroundRemoved = false;
     let backgroundClassification = "not-prepared";
-    let processingState: "ready" | "needs-review" | "selecting" | "failed" = "selecting";
+    let processingState: "ready" | "needs-review" | "selecting" | "failed" | "reviewing-extraction" = "selecting";
+    let cropUrl: string | null = null;
+    let hypotheses: NonNullable<ArtworkRegressionVisuals["hypotheses"]> = [];
 
-    if (analysis.classification === "TransparentLogo") {
+    if (fixtureName === "vodafone.jpg" || fixtureName === "riviera-di-mare.jpg") {
+      const area = fixtureName === "vodafone.jpg"
+        ? { x: 370, y: 1450, width: 1500, height: 1350 }
+        : { x: 390, y: 1650, width: 1500, height: 1150 };
+      const cropped = await createCroppedArtwork(logo, {
+        normalised: {
+          x: area.x / normalised.width,
+          y: area.y / normalised.height,
+          width: area.width / normalised.width,
+          height: area.height / normalised.height,
+        },
+        displayCrop: area,
+        displayedImage: { x: 0, y: 0, width: normalised.width, height: normalised.height },
+        naturalWidth: normalised.width,
+        naturalHeight: normalised.height,
+      });
+      cropUrl = cropped.objectUrl;
+      ownedUrls.push(cropUrl);
+      const allCandidates = await createAllExtractionCandidates(cropped.logo);
+      hypotheses = allCandidates.map((entry) => {
+        const url = URL.createObjectURL(entry.blob); ownedUrls.push(url);
+        return {
+          id: entry.id,
+          url,
+          confidence: entry.confidence,
+          validation: entry.validation,
+          inputMetrics: entry.inputMetrics,
+        };
+      });
+      const best = allCandidates.find((entry) => entry.validation.valid) ?? null;
+      if (best) {
+        const decodedCandidate = await decodeBlobToCanvas(best.blob);
+        candidate = canvasPixels(decodedCandidate.canvas);
+        const measured = measureCandidate(candidate);
+        candidateUrl = hypotheses.find((entry) => entry.id === best.id)?.url ?? null;
+        candidateValidation = {
+          valid: best.validation.valid,
+          transparencyRatio: measured.transparencyRatio,
+          foregroundCoverage: measured.foregroundCoverage,
+          foregroundBounds: measured.bounds,
+          rectangularity: measured.rectangularity,
+          internalHoles: measured.internalHoles,
+          reason: best.validation.reason,
+        };
+        backgroundRemoved = true;
+        backgroundClassification = "transparent-candidate";
+        processingState = "reviewing-extraction";
+      }
+    }
+
+    if (!candidate && analysis.classification === "TransparentLogo") {
       const decoded = await decodeBlobToCanvas(normalised.blob);
       candidate = canvasPixels(decoded.canvas);
       const measured = measureCandidate(candidate);
@@ -238,7 +304,7 @@ export async function runArtworkRegressionFixture(
         internalHoles: measured.internalHoles,
         reason: analysis.metrics.transparentRatio > 0 ? null : "Production analysis found no transparent pixels.",
       };
-    } else if (route === "prepare-automatically") {
+    } else if (!candidate && route === "prepare-automatically") {
       try {
         const prepared = await prepareArtwork(logo);
         if (!prepared) throw new Error("Preparation returned no raster candidate.");
@@ -304,7 +370,7 @@ export async function runArtworkRegressionFixture(
     const failureReasons = expectedFailures(fixtureName, partial);
     return {
       result: { ...partial, pass: failureReasons.length === 0, failureReasons, processingTimeMs: performance.now() - started },
-      visuals: { originalUrl, normalisedUrl: normalised.objectUrl, candidateUrl, monochromeUrl },
+      visuals: { originalUrl, normalisedUrl: normalised.objectUrl, candidateUrl, monochromeUrl, cropUrl, hypotheses },
       release: () => ownedUrls.forEach((url) => URL.revokeObjectURL(url)),
     };
   } catch (error) {

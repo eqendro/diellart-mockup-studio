@@ -15,6 +15,13 @@ export const pointerMidpoint = (first: Point, second: Point): Point => ({
   y: (first.y + second.y) / 2,
 });
 
+export const pointerAngle = (first: Point, second: Point) =>
+  (Math.atan2(second.y - first.y, second.x - first.x) * 180) / Math.PI;
+
+export function shortestAngleDelta(initial: number, current: number) {
+  return ((current - initial + 540) % 360) - 180;
+}
+
 export function applyGestureDelta(input: {
   placement: ArtworkPlacement;
   deltaX: number;
@@ -34,12 +41,14 @@ export function applyGestureDelta(input: {
     offsetY:
       input.placement.offsetY +
       (input.safeHeight > 0 ? input.deltaY / input.safeHeight : 0),
+    rotation: input.placement.rotation,
   };
   return clampPlacement(
     next,
     calculatePlacementLimits(scale, {
       mockup: input.mockup,
       artworkAspectRatio: input.artworkAspectRatio,
+      rotation: input.placement.rotation,
     }),
   );
 }
@@ -54,15 +63,26 @@ export function calculatePinchPlacement(input: {
   safeHeight: number;
   mockup: ProductMockup;
   artworkAspectRatio: number;
+  initialAngle?: number;
+  currentAngle?: number;
 }) {
   const ratio =
     input.initialDistance > 0
       ? input.currentDistance / input.initialDistance
       : 1;
-  return applyGestureDelta({
+  const rotation = input.initialAngle === undefined || input.currentAngle === undefined
+    ? input.placement.rotation
+    : input.placement.rotation + shortestAngleDelta(input.initialAngle, input.currentAngle);
+  const moved = applyGestureDelta({
     ...input,
+    placement: { ...input.placement, rotation },
     deltaX: input.midpointDeltaX,
     deltaY: input.midpointDeltaY,
     scale: input.placement.scale * ratio,
   });
+  return clampPlacement(moved, calculatePlacementLimits(moved.scale, {
+    mockup: input.mockup,
+    artworkAspectRatio: input.artworkAspectRatio,
+    rotation: moved.rotation,
+  }));
 }

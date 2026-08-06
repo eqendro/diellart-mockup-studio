@@ -1,0 +1,12 @@
+[
+  { "name": "google-photos-diellart", "pickerSource": "Google Photos", "fixture": "DiellArt", "expectedBroadRoute": "preview-ready or candidate review", "unacceptable": ["temporary provider handle remains unreadable after recovery", "solid block reaches renderer"] },
+  { "name": "google-photos-xhaura", "pickerSource": "Google Photos", "fixture": "Xh’Aura", "expectedBroadRoute": "preview-ready", "unacceptable": ["sideways result", "white rectangle reaches renderer"] },
+  { "name": "google-photos-aureva", "pickerSource": "Google Photos", "fixture": "Aureva", "expectedBroadRoute": "preview-ready or candidate review", "unacceptable": ["background rectangle", "lost gold lettering"] },
+  { "name": "google-photos-raffaello", "pickerSource": "Google Photos", "fixture": "Raffaello", "expectedBroadRoute": "crop then candidate review", "unacceptable": ["full wrapper photograph becomes printable artwork"] },
+  { "name": "google-photos-riviera", "pickerSource": "Google Photos", "fixture": "Riviera", "expectedBroadRoute": "crop then candidate review", "unacceptable": ["endless tighter-selection loop", "sideways result", "full photographed rectangle"] },
+  { "name": "google-photos-vodafone", "pickerSource": "Google Photos", "fixture": "Vodafone", "expectedBroadRoute": "crop then candidate review", "unacceptable": ["file-unreadable after a readable handle", "solid red rectangle", "full photographed crop reaches renderer"] },
+  { "name": "android-files-vodafone", "pickerSource": "Android Files", "fixture": "Vodafone", "expectedBroadRoute": "crop then candidate review", "unacceptable": ["file-unreadable", "solid red rectangle", "full photographed crop reaches renderer"] },
+  { "name": "samsung-gallery-vodafone", "pickerSource": "Samsung Gallery", "fixture": "Vodafone", "expectedBroadRoute": "crop then candidate review", "unacceptable": ["file-unreadable", "solid red rectangle"] },
+  { "name": "camera-raffaello", "pickerSource": "Camera", "fixture": "Raffaello", "expectedBroadRoute": "crop then candidate review", "unacceptable": ["full wrapper photograph becomes printable artwork"] },
+  { "name": "camera-riviera", "pickerSource": "Camera", "fixture": "Riviera", "expectedBroadRoute": "crop then candidate review", "unacceptable": ["endless tighter-selection loop", "sideways result", "full photographed rectangle"] }
+]

@@ -24,11 +24,11 @@ for (const viewport of [
     await expect(gallery).not.toHaveAttribute("capture");
     await expect(camera).toHaveAttribute("accept", "image/*");
     await expect(camera).toHaveAttribute("capture", "environment");
-    await expect(page.locator('label[for="gallery-logo-input"]')).toHaveCount(1);
-    await expect(page.locator('label[for="camera-logo-input"]')).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Choose logo file" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Take a photo", exact: true })).toHaveCount(1);
 
     const galleryChooser = page.waitForEvent("filechooser");
-    await page.getByText("Choose from device", { exact: true }).click();
+    await page.getByText("Choose logo file", { exact: true }).click();
     expect(await (await galleryChooser).element().getAttribute("id")).toBe("gallery-logo-input");
 
     const cameraChooser = page.waitForEvent("filechooser");
@@ -37,6 +37,16 @@ for (const viewport of [
     expect(pageErrors).toEqual([]);
   });
 }
+
+test("desktop keeps the stored-file workflow and does not expose the mobile camera action", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Choose logo file" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Take a photo", exact: true })).toBeHidden();
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose logo file" }).click();
+  expect(await (await chooser).element().getAttribute("id")).toBe("gallery-logo-input");
+});
 
 test("gallery and camera input events enter the same visible processing chain", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -52,7 +62,7 @@ test("gallery and camera input events enter the same visible processing chain", 
   await page.goto("/?debugUpload=1");
   const gallery = page.locator("#gallery-logo-input");
   await gallery.setInputFiles(fixture("Xh'Aura.jpeg"));
-  await expect(page.getByText(/resulting route:/)).toBeVisible();
+  await expect(page.getByText(/final route:/)).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & { uploadHeadings: string[] }).uploadHeadings))
     .toContain("Reading your image…");
   await expect(page.getByText(/change event fired:/)).toBeVisible();
@@ -62,8 +72,135 @@ test("gallery and camera input events enter the same visible processing chain", 
   await page.goto("/?debugUpload=1");
   const camera = page.locator("#camera-logo-input");
   await camera.setInputFiles(fixture("Xh'Aura.jpeg"));
-  await expect(page.getByText(/resulting route:/)).toBeVisible();
+  await expect(page.getByText(/final route:/)).toBeVisible();
   await expect(page.getByText(/first File obtained: camera/)).toBeVisible();
+});
+
+test("native input remains mounted and retains the File until owned bytes resolve", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = File.prototype.arrayBuffer;
+    const state = window as typeof window & { ownershipProbe?: Record<string, boolean> };
+    state.ownershipProbe = {};
+    File.prototype.arrayBuffer = async function () {
+      state.ownershipProbe!.started = true;
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      const input = document.querySelector<HTMLInputElement>("#gallery-logo-input");
+      state.ownershipProbe!.mountedDuringRead = Boolean(input?.isConnected);
+      state.ownershipProbe!.retainedDuringRead = input?.files?.length === 1;
+      return original.call(this);
+    };
+  });
+  await page.goto("/?debugUpload=1");
+  const input = page.locator("#gallery-logo-input");
+  await input.setInputFiles(fixture("EC.png"));
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { ownershipProbe?: Record<string, boolean> }).ownershipProbe?.started)).toBe(true);
+  await expect(input).toBeAttached();
+  await expect.poll(() => input.evaluate((element: HTMLInputElement) => element.files?.length)).toBe(1);
+  await expect(page.getByText(/input reset after ownership: success/)).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { ownershipProbe?: Record<string, boolean> }).ownershipProbe)).toMatchObject({
+    mountedDuringRead: true,
+    retainedDuringRead: true,
+  });
+  await expect.poll(() => input.evaluate((element: HTMLInputElement) => element.files?.length)).toBe(0);
+});
+
+test("primary provider failure uses one FileReader fallback before resetting the input", async ({ page }) => {
+  await page.addInitScript(() => {
+    let calls = 0;
+    File.prototype.arrayBuffer = async function () {
+      calls++;
+      throw new DOMException(`forced provider failure ${calls}`, "NotReadableError");
+    };
+  });
+  await page.goto("/?debugUpload=1");
+  await page.locator("#gallery-logo-input").setInputFiles(fixture("EC.png"));
+  await expect(page.getByText(/primary copy failed:/)).toBeVisible();
+  await expect(page.getByText(/fallback copy started:/)).toBeVisible();
+  await expect(page.getByText(/fallback copy succeeded:/)).toBeVisible();
+  await expect(page.getByText(/input reset after ownership: success/)).toBeVisible();
+  await expect(page.getByText(/upload state updated: accepted/)).toBeVisible();
+});
+
+test("provider NotReadableError enters recovery and both actions reopen native inputs", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "showOpenFilePicker", { configurable: true, value: undefined });
+    File.prototype.arrayBuffer = () => Promise.reject(new DOMException("primary failed", "NotReadableError"));
+    FileReader.prototype.readAsArrayBuffer = function () {
+      const state = window as typeof window & { providerReadAttempts?: number; terminalProbe?: { mounted: boolean; retained: boolean } };
+      state.providerReadAttempts = (state.providerReadAttempts ?? 0) + 1;
+      const input = document.querySelector<HTMLInputElement>("#gallery-logo-input");
+      state.terminalProbe = {
+        mounted: Boolean(input?.isConnected),
+        retained: input?.files?.length === 1,
+      };
+      setTimeout(() => this.dispatchEvent(new ProgressEvent("error")), 150);
+    };
+  });
+  await page.goto("/?debugUpload=1");
+  const input = page.locator("#gallery-logo-input");
+  await input.setInputFiles(fixture("EC.png"));
+  await expect(page.getByText(/fallback copy started:/)).toBeVisible();
+  await expect(page.getByText(/fallback copy failed:/)).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { terminalProbe?: { mounted: boolean; retained: boolean } }).terminalProbe)).toEqual({ mounted: true, retained: true });
+  await expect(page.getByText(/input reset after ownership: terminal failure/)).toBeVisible();
+  await expect(page.getByText("This photo could not be opened", { exact: true })).toBeVisible();
+  await expect(page.getByText("Your phone returned a temporary photo preview instead of the original file. Choose the image through Files or Browse.", { exact: true })).toBeVisible();
+  await expect(page.getByText(/recovery state entered: android-provider-file-unreadable/)).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { providerReadAttempts?: number }).providerReadAttempts)).toBe(1);
+  await expect.poll(() => input.evaluate((element: HTMLInputElement) => element.files?.length)).toBe(0);
+
+  const fileChooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose through Files" }).click();
+  expect(await (await fileChooser).element().getAttribute("id")).toBe("gallery-logo-input");
+  await expect(page.getByText(/recovery action selected: Choose through Files/)).toBeVisible();
+
+  const cameraChooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Take a photo instead" }).click();
+  expect(await (await cameraChooser).element().getAttribute("id")).toBe("camera-logo-input");
+  await expect(page.getByText(/recovery action selected: Take a photo instead/)).toBeVisible();
+});
+
+test("non-provider read failures retain the generic unreadable state", async ({ page }) => {
+  await page.addInitScript(() => {
+    File.prototype.arrayBuffer = () => Promise.reject(new DOMException("generic read failure", "InvalidStateError"));
+    FileReader.prototype.readAsArrayBuffer = function () {
+      setTimeout(() => this.dispatchEvent(new ProgressEvent("error")), 0);
+    };
+  });
+  await page.goto("/?debugUpload=1");
+  await page.locator("#gallery-logo-input").setInputFiles(fixture("EC.png"));
+  await expect(page.getByText("File unreadable", { exact: true })).toBeVisible();
+  await expect(page.getByText("This photo could not be opened", { exact: true })).toHaveCount(0);
+});
+
+test("decoder failure remains separate from provider-handle recovery", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.createImageBitmap = () => Promise.reject(new DOMException("bitmap unavailable", "NotSupportedError"));
+    Object.defineProperty(HTMLImageElement.prototype, "src", {
+      configurable: true,
+      set() {
+        queueMicrotask(() => this.onerror?.(new Event("error")));
+      },
+    });
+  });
+  await page.goto("/");
+  await page.locator("#gallery-logo-input").setInputFiles(fixture("EC.png"));
+  await expect(page.getByText("Could not use image", { exact: true })).toBeVisible();
+  await expect(page.getByText("This photo could not be opened", { exact: true })).toHaveCount(0);
+});
+
+test("focus returning before delayed Android change does not leave a watchdog warning", async ({ page }) => {
+  await page.goto("/?debugUpload=1");
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.getByText("Choose logo file", { exact: true }).click();
+  const chooser = await chooserPromise;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForTimeout(500);
+  await chooser.setFiles(fixture("EC.png"));
+  await expect(page.getByText(/upload state updated: accepted/)).toBeVisible();
+  await page.waitForTimeout(1700);
+  await expect(page.getByText(/Picker returned, but no file change event was received/)).toHaveCount(0);
+  await expect(page.locator(".upload-error")).toHaveCount(0);
 });
 
 test("bitmap rejection uses the HTML decoder fallback and continues", async ({ page }) => {
@@ -73,8 +210,9 @@ test("bitmap rejection uses the HTML decoder fallback and continues", async ({ p
   await page.goto("/?debugUpload=1");
   await page.locator("#gallery-logo-input").setInputFiles(fixture("Xh'Aura.jpeg"));
   await expect(page.getByText(/HTMLImageElement fallback attempted/).first()).toBeVisible();
-  await expect(page.getByText(/resulting route:/)).toBeVisible();
+  await expect(page.getByText(/final route:/)).toBeVisible();
   await expect(page.getByText(/decode failed:/)).toHaveCount(0);
+  await expect(page.getByText("This photo could not be opened", { exact: true })).toHaveCount(0);
 });
 
 test("unsupported bitmap options retry plain createImageBitmap before HTML fallback", async ({ page }) => {
@@ -90,7 +228,7 @@ test("unsupported bitmap options retry plain createImageBitmap before HTML fallb
   await expect(page.getByText(/createImageBitmap-options failed: NotSupportedError/).first()).toBeVisible();
   await expect(page.getByText(/createImageBitmap-plain result:/).first()).toBeVisible();
   await expect(page.getByText(/HTMLImageElement fallback attempted/)).toHaveCount(0);
-  await expect(page.getByText(/resulting route:/)).toBeVisible();
+  await expect(page.getByText(/final route:/)).toBeVisible();
 });
 
 test("HTML onload remains successful when img.decode rejects", async ({ page }) => {
@@ -213,9 +351,10 @@ test("development page hydrates and receives ordinary React events", async ({ pa
 test("development watchdog reports picker return without change", async ({ page }) => {
   await page.goto("/?debugUpload=1");
   const chooser = page.waitForEvent("filechooser");
-  await page.getByText("Choose from device", { exact: true }).click();
+  await page.getByText("Choose logo file", { exact: true }).click();
   await chooser;
   await page.waitForTimeout(600);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByText(/Picker returned, but no file change event was received/)).toBeVisible();
+  await expect(page.getByText(/Picker returned, but no file change event was received/)).toBeVisible({ timeout: 2500 });
+  await expect(page.locator(".upload-error")).toHaveCount(0);
 });
