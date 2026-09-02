@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PreviewCard } from "@/components/ui/PreviewCard";
 import { pocketPaperProductView } from "@/config/products/pocket-paper";
 import { MockupRenderer } from "@/features/mockup-engine/components/MockupRenderer";
 import {
@@ -25,21 +24,11 @@ import { LogoUpload } from "@/features/upload/components/LogoUpload";
 import { useLogoUpload } from "@/features/upload/hooks/use-logo-upload";
 import { ProofToolbar } from "@/features/personalisation/components/ProofToolbar";
 import { PrintColourSelector } from "@/features/personalisation/components/PrintColourSelector";
-
-const scenePreviews = [
-  {
-    title: "Main Dish Setting",
-    description: "See your branding presented in a refined table setting.",
-    variant: "main" as const,
-  },
-  {
-    title: "Dessert Setting",
-    description: "Preview the details in a lighter finishing-course scene.",
-    variant: "dessert" as const,
-  },
-];
+import { SceneGallery } from "@/features/scene-engine/components/SceneGallery";
+import { sceneText } from "@/features/scene-engine/localisation";
 
 export function PocketPaperPersonaliser() {
+  const labels = sceneText("en");
   const upload = useLogoUpload();
   const preparation = usePreparedArtwork(upload.logo, upload.recordTrace);
   const monochrome = useMonochromeArtwork(preparation.printableArtwork);
@@ -343,27 +332,18 @@ export function PocketPaperPersonaliser() {
       )}
       {!preparation.cropOpen ? <div className="container lifestyle-section">
         <header className="section-header">
-          <p className="text-eyebrow">Lifestyle previews</p>
+          <p className="text-eyebrow">{labels.lifestylePreviews}</p>
           <h2 id="preview-heading" className="text-section-heading">
-            Your product, thoughtfully presented.
+            {labels.lifestyleHeading}
           </h2>
           <p className="text-body">
-            Product View is personalised in your browser. The table-setting
-            scenes will follow in a later stage.
+            {labels.lifestyleDescription}
           </p>
         </header>
-        <div className="preview-grid">
-          {!upload.logo ? (
-            <PreviewCard
-              title="Product View"
-              description="Upload a logo to create your personalised Pocket Paper preview."
-              variant="product"
-            />
-          ) : null}
-          {scenePreviews.map((preview) => (
-            <PreviewCard key={preview.title} {...preview} />
-          ))}
-        </div>
+        <SceneGallery
+          artwork={preparation.customerState.status === "preview-ready" && monochrome.status === "ready" ? monochrome.artwork : null}
+          placement={placement}
+        />
       </div> : null}
     </>
   );

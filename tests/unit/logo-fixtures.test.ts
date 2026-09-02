@@ -91,24 +91,23 @@ describe("supplied logo fixtures", () => {
     expect(prepared.foregroundBounds.height).toBeLessThan(prepared.height);
   });
 
-  it("preserves Xh’Aura enclosed white counters through monochrome conversion", async () => {
+  it("makes Xh’Aura enclosed white counters transparent before monochrome conversion", async () => {
     const prepared = prepareArtworkPixels(await readFixture("Xh'Aura.jpeg"));
     const monochrome = createMonochromePixels(prepared, "#00843D");
     let protectedCounterPixels = 0;
+    let opaqueLightPixels = 0;
     for (let offset = 0; offset < prepared.data.length; offset += 4) {
       if (
-        prepared.data[offset + 3] > 0 &&
         prepared.data[offset] >= 242 &&
         prepared.data[offset + 1] >= 242 &&
         prepared.data[offset + 2] >= 242
       ) {
         protectedCounterPixels++;
-        expect([...monochrome.data.slice(offset, offset + 4)]).toEqual(
-          [...prepared.data.slice(offset, offset + 4)],
-        );
+        if (prepared.data[offset + 3] !== 0 || monochrome.data[offset + 3] !== 0) opaqueLightPixels++;
       }
     }
     expect(protectedCounterPixels).toBeGreaterThan(100);
+    expect(opaqueLightPixels).toBe(0);
   });
 
   it("retains both neutral EC lettering and red Analytics lettering", async () => {

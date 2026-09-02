@@ -380,6 +380,10 @@ export function MockupRenderer({
           src={artwork.url}
           alt=""
           className="mockup-logo"
+          data-alpha-left={artwork.foregroundBounds.x}
+          data-alpha-top={artwork.foregroundBounds.y}
+          data-alpha-width={artwork.foregroundBounds.width}
+          data-alpha-height={artwork.foregroundBounds.height}
           draggable={false}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}

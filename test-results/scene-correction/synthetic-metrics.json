@@ -1,0 +1,106 @@
+[
+  {
+    "scene": "main-dish",
+    "preparedRaster": {
+      "width": 800,
+      "height": 500
+    },
+    "alphaBounds": {
+      "left": "0",
+      "top": "0",
+      "width": "800",
+      "height": "500"
+    },
+    "physicalBounds": {
+      "centerX": 0.49999999999999994,
+      "centerY": 0.5,
+      "widthRatio": 0.650496,
+      "heightRatio": 0.30719797995738973
+    },
+    "visiblePhysicalBounds": {
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "widthRatio": 0.7744000000000001,
+      "heightRatio": 0.3657118809016545
+    },
+    "printableQuadrilateral": {
+      "topLeft": {
+        "x": 0.18,
+        "y": 0.582
+      },
+      "topRight": {
+        "x": 0.351,
+        "y": 0.604
+      },
+      "bottomRight": {
+        "x": 0.409,
+        "y": 0.952
+      },
+      "bottomLeft": {
+        "x": 0.225,
+        "y": 0.987
+      }
+    },
+    "surfaceCoordinates": "safe-area",
+    "distortion": {
+      "topToBottomRatio": 0.9727393024827893,
+      "leftToRightRatio": 1.1093446608330264,
+      "aspectRatioScale": 0.9188027954059109,
+      "horizontalDivergenceDeg": 4.426321036646328,
+      "verticalDivergenceDeg": 3.533141504323254
+    },
+    "transformMatrix": "matrix3d(0.22654089643392614,0.07657509111705267,0,0.00015008300568276005,0.013989551711918236,0.14652737411256095,0,-0.00008850262993402602,0,0,1,0,220.26652246586266,477.2720126347548,0,1)"
+  },
+  {
+    "scene": "dessert",
+    "preparedRaster": {
+      "width": 800,
+      "height": 500
+    },
+    "alphaBounds": {
+      "left": "0",
+      "top": "0",
+      "width": "800",
+      "height": "500"
+    },
+    "physicalBounds": {
+      "centerX": 0.49999999999999994,
+      "centerY": 0.5,
+      "widthRatio": 0.650496,
+      "heightRatio": 0.30719797995738973
+    },
+    "visiblePhysicalBounds": {
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "widthRatio": 0.7744000000000001,
+      "heightRatio": 0.3657118809016545
+    },
+    "printableQuadrilateral": {
+      "topLeft": {
+        "x": 0.165,
+        "y": 0.532
+      },
+      "topRight": {
+        "x": 0.357,
+        "y": 0.51
+      },
+      "bottomRight": {
+        "x": 0.499,
+        "y": 0.883
+      },
+      "bottomLeft": {
+        "x": 0.182,
+        "y": 0.988
+      }
+    },
+    "surfaceCoordinates": "paper",
+    "distortion": {
+      "topToBottomRatio": 0.8557487645416484,
+      "leftToRightRatio": 1.0256897062809092,
+      "aspectRatioScale": 1.177223791009966,
+      "horizontalDivergenceDeg": 2.3148240500284487,
+      "verticalDivergenceDeg": 17.338013200810394
+    },
+    "transformMatrix": "matrix3d(0.21767742015380928,0.018194720788813953,0,0.00009305369499342811,-0.04546134589887518,0.01089102030587677,0,-0.0003114647487380666,0,0,1,0,215.43626373951997,427.66324776871164,0,1)"
+  }
+]

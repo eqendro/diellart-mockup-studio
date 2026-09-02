@@ -69,10 +69,10 @@ describe("monochrome artwork", () => {
     }
   });
 
-  it("keeps protected internal white space unprinted without changing alpha", () => {
+  it("does not invent opacity while recolouring prepared pixels", () => {
     const source = raster([
-      [255, 255, 255, 255],
-      [248, 248, 247, 180],
+      [255, 255, 255, 0],
+      [248, 248, 247, 0],
       [120, 120, 120, 255],
     ]);
     const result = createMonochromePixels(source, PRINT_COLOURS.green);
@@ -80,7 +80,7 @@ describe("monochrome artwork", () => {
     expect([...result.data.slice(4, 7)]).toEqual([248, 248, 247]);
     expect([...result.data.slice(8, 11)]).toEqual(hexToRgb(PRINT_COLOURS.green));
     expect([result.data[3], result.data[7], result.data[11]]).toEqual([
-      255, 180, 255,
+      0, 0, 255,
     ]);
   });
 

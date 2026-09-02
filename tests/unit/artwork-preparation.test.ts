@@ -103,14 +103,14 @@ describe("prepareArtworkPixels", () => {
     expect(prepareArtworkPixels(source).veryLight).toBe(true);
   });
 
-  it("keeps internal white details disconnected from the edge", () => {
+  it("removes enclosed white matte disconnected from the edge", () => {
     const source = image(40, 40, [255, 255, 255, 255]);
     for (let y = 8; y < 32; y++) for (let x = 8; x < 32; x++) setPixel(source, x, y, [15, 15, 15, 255]);
     for (let y = 16; y < 24; y++) for (let x = 16; x < 24; x++) setPixel(source, x, y, [255, 255, 255, 255]);
     const result = prepareArtworkPixels(source);
     const centre = ((result.height / 2 | 0) * result.width + (result.width / 2 | 0)) * 4;
     expect(result.backgroundRemoved).toBe(true);
-    expect(result.data[centre + 3]).toBe(255);
+    expect(result.data[centre + 3]).toBe(0);
   });
 
   it("does not remove a non-white photographic border", () => {

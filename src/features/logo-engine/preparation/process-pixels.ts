@@ -175,6 +175,29 @@ function removeConnectedBackground(
   }
 }
 
+/**
+ * Border flood-fill cannot reach enclosed counters in raster typography. Once
+ * a removable background has been positively identified, remove pixels that
+ * still match that same matte anywhere in the raster. The distance ramp keeps
+ * anti-aliased dark stroke edges instead of applying a binary threshold.
+ */
+function removeEnclosedBackgroundMatte(
+  image: PixelImage,
+  background: readonly [number, number, number],
+  tolerance: number,
+  config: ArtworkPreparationConfig,
+) {
+  for (let offset = 0; offset < image.data.length; offset += 4) {
+    if (image.data[offset + 3] === 0) continue;
+    const distance = colourDistance(image.data, offset, background);
+    if (distance > tolerance + config.featherDistance) continue;
+    image.data[offset + 3] = Math.min(
+      image.data[offset + 3],
+      Math.round(255 * Math.max(0, (distance - tolerance) / config.featherDistance)),
+    );
+  }
+}
+
 function isVeryLightArtwork(image: PixelImage, config: ArtworkPreparationConfig) {
   let count = 0;
   let dark = 0;
@@ -337,6 +360,7 @@ export function prepareArtworkPixels(
   const background = estimateBorder(working, config);
   if (background) {
     removeConnectedBackground(working, background.colour, background.tolerance, config);
+    removeEnclosedBackgroundMatte(working, background.colour, background.tolerance, config);
   }
   const cropped = cropTransparentMargins(working, config);
   const validationPassed = hasTransparentBorder
