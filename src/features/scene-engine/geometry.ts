@@ -11,7 +11,7 @@ const masterSurfaceAspectRatio =
   (pocketPaperProductView.productBounds.width * pocketPaperProductView.surface.width * pocketPaperProductView.intrinsicSize.width) /
   (pocketPaperProductView.productBounds.height * pocketPaperProductView.surface.height * pocketPaperProductView.intrinsicSize.height);
 
-function solveHomography(source: NormalisedPoint[], target: NormalisedPoint[]): Matrix {
+export function solveHomography(source: NormalisedPoint[], target: NormalisedPoint[]): Matrix {
   const rows = source.flatMap((point, index) => {
     const targetPoint = target[index];
     return [
@@ -111,6 +111,13 @@ export function resolveSceneArtwork(
     [{ x: 0, y: 0 }, { x: artwork.canvasWidth, y: 0 }, { x: artwork.canvasWidth, y: artwork.canvasHeight }, { x: 0, y: artwork.canvasHeight }],
     projected,
   );
+  const projectedCanvasQuad: SurfaceQuad = {
+    topLeft: projected[0], topRight: projected[1], bottomRight: projected[2], bottomLeft: projected[3],
+  };
+  const inverseProjection = solveHomography(projected, [
+    { x: 0, y: 0 }, { x: artwork.canvasWidth, y: 0 },
+    { x: artwork.canvasWidth, y: artwork.canvasHeight }, { x: 0, y: artwork.canvasHeight },
+  ]);
   const [a, b, c, d, e, f, g, h, i] = imageMatrix;
   const foreground = artwork.foregroundBounds;
   const normalizedFit = { x: fit.x / masterSurfaceAspectRatio, y: fit.y, width: fit.width / masterSurfaceAspectRatio, height: fit.height };
@@ -139,6 +146,8 @@ export function resolveSceneArtwork(
     visiblePhysicalBounds,
     alphaBounds: { ...foreground },
     projectedAlphaQuad,
+    projectedCanvasQuad,
+    inverseProjection,
     distortion: measureProjectionDistortion(projectedAlphaQuad, artwork.aspectRatio),
   };
 }

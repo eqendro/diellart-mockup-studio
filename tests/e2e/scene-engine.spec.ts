@@ -7,6 +7,7 @@ import { getScene, resolveSceneArtwork } from "../../src/features/scene-engine";
 const logo = path.resolve(process.cwd(), "tests", "assets", "logos", "EC.png");
 const calibrationArtwork = path.resolve(process.cwd(), "tests", "assets", "logos", "scene-calibration.svg");
 const xhAuraArtwork = path.resolve(process.cwd(), "tests", "assets", "logos", "Xh'Aura.jpeg");
+const typeDetailArtwork = path.resolve(process.cwd(), "tests", "assets", "logos", "scene-type-detail.svg");
 
 async function captureSceneQa(page: import("@playwright/test").Page, prefix: string) {
   await mkdir("test-results/scene-correction", { recursive: true });
@@ -22,9 +23,33 @@ async function captureSceneQa(page: import("@playwright/test").Page, prefix: str
     const scene = page.locator(`[data-scene-id="${id}"]`);
     const image = scene.locator(".scene-artwork");
     await expect(image).toBeVisible();
+    const materialCanvas = scene.locator(".scene-print-canvas");
+    await expect(materialCanvas).toHaveAttribute("data-ready", "true");
     const scenePath = `test-results/scene-correction/${prefix}-${filename}.png`;
     await page.locator(".scene-preview-frame").screenshot({ path: scenePath });
-    await image.screenshot({ path: `test-results/scene-correction/${prefix}-${filename}-closeup.png` });
+    const stageBounds = await scene.locator(".scene-stage").boundingBox();
+    const alphaQuad = JSON.parse(await scene.getAttribute("data-projected-alpha-quad") ?? "null") as Record<string, { x: number; y: number }>;
+    const alphaPoints = Object.values(alphaQuad);
+    const minAlphaX = Math.min(...alphaPoints.map((point) => point.x));
+    const maxAlphaX = Math.max(...alphaPoints.map((point) => point.x));
+    const minAlphaY = Math.min(...alphaPoints.map((point) => point.y));
+    const maxAlphaY = Math.max(...alphaPoints.map((point) => point.y));
+    await page.screenshot({
+      path: `test-results/scene-correction/${prefix}-${filename}-closeup.png`,
+      clip: { x: stageBounds!.x + minAlphaX - 8, y: stageBounds!.y + minAlphaY - 8, width: maxAlphaX - minAlphaX + 16, height: maxAlphaY - minAlphaY + 16 },
+    });
+    await materialCanvas.evaluate((element) => { (element as HTMLElement).style.display = "none"; });
+    const originalStyle = await image.getAttribute("style");
+    await image.evaluate((element, sceneId) => {
+      const target = element as HTMLElement;
+      target.style.opacity = "0.873";
+      target.style.filter = sceneId === "main-dish"
+        ? "brightness(0.96) contrast(0.95) saturate(0.94) blur(0.06px)"
+        : "brightness(1) contrast(0.95) saturate(0.94) blur(0.06px)";
+    }, id);
+    await page.locator(".scene-preview-frame").screenshot({ path: `test-results/scene-correction/${prefix}-${filename}-before-material.png` });
+    await image.evaluate((element, style) => element.setAttribute("style", style ?? ""), originalStyle);
+    await materialCanvas.evaluate((element) => { (element as HTMLElement).style.display = ""; });
     fullPaths.push(scenePath);
     records.push(await scene.evaluate((element) => ({
       scene: element.getAttribute("data-scene-id"),
@@ -36,6 +61,18 @@ async function captureSceneQa(page: import("@playwright/test").Page, prefix: str
       surfaceCoordinates: element.getAttribute("data-surface-coordinates"),
       distortion: JSON.parse(element.getAttribute("data-distortion") ?? "null"),
       transformMatrix: element.getAttribute("data-transform-matrix"),
+      inkPixelDiagnostics: (() => {
+        const canvas = element.querySelector(".scene-print-canvas") as HTMLCanvasElement;
+        const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+        let count = 0; let red = 0; let green = 0; let blue = 0; let luminance = 0; let luminanceSquared = 0;
+        for (let offset = 0; offset < pixels.length; offset += 4) {
+          if (pixels[offset + 3] < 220) continue;
+          const value = pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722;
+          count++; red += pixels[offset]; green += pixels[offset + 1]; blue += pixels[offset + 2]; luminance += value; luminanceSquared += value * value;
+        }
+        const mean = luminance / count;
+        return { opaquePixels: count, meanRgb: [red / count, green / count, blue / count], luminanceMean: mean, luminanceStdDev: Math.sqrt(luminanceSquared / count - mean * mean) };
+      })(),
     })));
   }
   await writeFile(`test-results/scene-correction/${prefix}-metrics.json`, JSON.stringify(records, null, 2));
@@ -117,12 +154,18 @@ test.describe("Scene Engine presentation", () => {
 
   test("captures corrected synthetic and XhAura lifestyle comparisons", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1100 });
-    for (const [fixture, prefix] of [[calibrationArtwork, "synthetic"], [xhAuraArtwork, "xh-aura"]] as const) {
+    for (const [fixture, prefix, colour] of [
+      [calibrationArtwork, "synthetic-wide", null],
+      [typeDetailArtwork, "synthetic-detail", null],
+      [xhAuraArtwork, "xh-aura-black", null],
+      [xhAuraArtwork, "xh-aura-green", "Green"],
+    ] as const) {
       await page.goto("/");
       await page.getByLabel("Select a logo file").setInputFiles(fixture);
       await expect(page.locator(".mockup-logo")).toBeVisible();
+      if (colour) await page.getByRole("button", { name: colour }).click();
       await captureSceneQa(page, prefix);
-      if (prefix === "xh-aura") {
+      if (prefix === "xh-aura-black") {
         await page.getByRole("button", { name: "Main Dish" }).click();
         const stage = page.locator('[data-scene-id="main-dish"] .scene-stage');
         const size = await stage.boundingBox();

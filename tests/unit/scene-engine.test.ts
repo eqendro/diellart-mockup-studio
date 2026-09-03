@@ -120,6 +120,21 @@ describe("scene artwork transfer", () => {
     expect(mapped.distortion.topToBottomRatio).toBeLessThan(1.15);
     expect(mapped.distortion.horizontalDivergenceDeg).toBeLessThan(8);
   });
+
+  it("keeps paper geometry independent from conservative print material tuning", () => {
+    expect(getScene("main-dish")!.paperSurface).toEqual({
+      topLeft: { x: 0.076, y: 0.6 }, topRight: { x: 0.319, y: 0.538 },
+      bottomRight: { x: 0.336, y: 0.845 }, bottomLeft: { x: 0.113, y: 0.92 },
+    });
+    expect(getScene("dessert")!.paperSurface).toEqual({
+      topLeft: { x: 0.165, y: 0.532 }, topRight: { x: 0.357, y: 0.51 },
+      bottomRight: { x: 0.499, y: 0.883 }, bottomLeft: { x: 0.182, y: 0.988 },
+    });
+    for (const scene of lifestyleScenes) {
+      expect(scene.printMaterial.edgeSoftnessPxAt1024).toBeLessThanOrEqual(0.12);
+      expect(scene.printMaterial.inkOpacity).toBeGreaterThanOrEqual(0.98);
+    }
+  });
 });
 
 describe("scene presentation contract", () => {

@@ -12,6 +12,14 @@ const sharedPaperLighting = {
   blurPx: 0.06,
 } as const;
 
+const sharedPrintMaterial = {
+  inkOpacity: 0.98,
+  density: 0.965,
+  luminanceInfluence: 0.055,
+  textureInfluence: 0.08,
+  edgeSoftnessPxAt1024: 0.1,
+} as const;
+
 const scenes = [
   {
     id: "product-view",
@@ -27,6 +35,7 @@ const scenes = [
     safeMargins: { horizontal: 0.08, vertical: 0.08 },
     lighting: { ...sharedPaperLighting, opacity: 0.92, brightness: 1, contrast: 0.96, blurPx: 0.15 },
     paperTexture: 0.05,
+    printMaterial: { ...sharedPrintMaterial, luminanceInfluence: 0.035, textureInfluence: 0.04 },
     framing: { desktopObjectPosition: "50% 50%", mobileObjectPosition: "50% 50%" },
     fallbackLabelKey: "previewUnavailable",
   },
@@ -49,6 +58,7 @@ paperSurface: {
     safeMargins: { horizontal: 0.08, vertical: 0.08 },
     lighting: { ...sharedPaperLighting, brightness: 0.96 },
     paperTexture: 0.14,
+    printMaterial: { ...sharedPrintMaterial, luminanceInfluence: 0.06, textureInfluence: 0.09, edgeSoftnessPxAt1024: 0.12 },
     framing: { desktopObjectPosition: "50% 50%", mobileObjectPosition: "42% 50%" },
     fallbackLabelKey: "previewUnavailable",
   },
@@ -66,6 +76,7 @@ paperSurface: {
     safeMargins: { horizontal: 0.08, vertical: 0.08 },
     lighting: { ...sharedPaperLighting, brightness: 1 },
     paperTexture: 0.14,
+    printMaterial: { ...sharedPrintMaterial, luminanceInfluence: 0.05, textureInfluence: 0.08 },
     framing: { desktopObjectPosition: "50% 50%", mobileObjectPosition: "45% 50%" },
     fallbackLabelKey: "previewUnavailable",
   },
@@ -80,6 +91,9 @@ export function validateScene(scene: SceneDefinition): string[] {
   if (scene.safeMargins.horizontal < 0 || scene.safeMargins.horizontal >= 0.5 || scene.safeMargins.vertical < 0 || scene.safeMargins.vertical >= 0.5) errors.push("Safe margins must be between zero and one half.");
   if (scene.lighting.opacity < 0 || scene.lighting.opacity > 1) errors.push("Opacity must be between zero and one.");
   if (scene.paperTexture < 0 || scene.paperTexture > 1) errors.push("Paper texture must be between zero and one.");
+  const material = scene.printMaterial;
+  if ([material.inkOpacity, material.density, material.luminanceInfluence, material.textureInfluence].some((value) => value < 0 || value > 1)) errors.push("Print material values must be between zero and one.");
+  if (material.edgeSoftnessPxAt1024 < 0 || material.edgeSoftnessPxAt1024 > 0.3) errors.push("Print edge softness must remain sub-pixel and conservative.");
   return errors;
 }
 

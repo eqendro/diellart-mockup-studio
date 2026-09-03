@@ -6,6 +6,7 @@ import type { ArtworkPlacement } from "@/features/mockup-engine/placement";
 import { resolveSceneArtwork } from "@/features/scene-engine/geometry";
 import { sceneText, type SceneLocale } from "@/features/scene-engine/localisation";
 import type { SceneDefinition } from "@/features/scene-engine/types";
+import { ScenePrintCanvas } from "@/features/scene-engine/components/ScenePrintCanvas";
 
 type ScenePreviewProps = {
   scene: SceneDefinition;
@@ -37,6 +38,8 @@ export function ScenePreview({ scene, artwork, placement, locale = "en" }: Scene
     ? resolveSceneArtwork(artwork, placement, scene, size.width, size.height)
     : null;
   const label = labels[scene.labelKey];
+  const material = scene.printMaterial;
+  const edgeSoftness = Math.min(0.2, material.edgeSoftnessPxAt1024 * size.width / 1024);
 
   return (
     <article
@@ -48,6 +51,7 @@ export function ScenePreview({ scene, artwork, placement, locale = "en" }: Scene
       data-distortion={mapped ? JSON.stringify(mapped.distortion) : undefined}
       data-physical-bounds={mapped ? JSON.stringify(mapped.physicalBounds) : undefined}
       data-visible-physical-bounds={mapped ? JSON.stringify(mapped.visiblePhysicalBounds) : undefined}
+      data-projected-alpha-quad={mapped ? JSON.stringify(mapped.projectedAlphaQuad) : undefined}
     >
         <div
           ref={stageRef}
@@ -69,12 +73,13 @@ export function ScenePreview({ scene, artwork, placement, locale = "en" }: Scene
           ) : <span className="scene-fallback">{labels[scene.fallbackLabelKey]}</span>}
           {artwork && mapped ? (
             <div className="scene-surface" aria-hidden="true">
+              <ScenePrintCanvas scene={scene} artwork={artwork} mapped={mapped} width={size.width} height={size.height} />
               {/* Blob URLs are browser-local and cannot use Next image optimisation. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={artwork.url}
                 alt=""
-                className="scene-artwork"
+                className="scene-artwork scene-artwork-source"
                 data-placement-scale={placement.scale}
                 data-placement-rotation={placement.rotation}
                 data-placement-offset-x={placement.offsetX}
@@ -90,9 +95,9 @@ export function ScenePreview({ scene, artwork, placement, locale = "en" }: Scene
                   height: mapped.height,
                   transform: mapped.matrix3d,
                   transformOrigin: "0 0",
-                  opacity: scene.lighting.opacity * (1 - scene.paperTexture * 0.05),
+                  opacity: 0,
                   mixBlendMode: artwork.veryLight ? "normal" : scene.lighting.blendMode,
-                  filter: `brightness(${scene.lighting.brightness}) contrast(${scene.lighting.contrast}) saturate(${scene.lighting.saturation}) blur(${scene.lighting.blurPx}px)`,
+                  filter: `brightness(${scene.lighting.brightness * material.density}) contrast(${scene.lighting.contrast}) saturate(${Math.max(0.98, scene.lighting.saturation)}) blur(${edgeSoftness}px)`,
                 }}
               />
             </div>

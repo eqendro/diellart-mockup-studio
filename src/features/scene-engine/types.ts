@@ -32,6 +32,13 @@ export type SceneDefinition = {
     blurPx: number;
   };
   paperTexture: number;
+  printMaterial: {
+    inkOpacity: number;
+    density: number;
+    luminanceInfluence: number;
+    textureInfluence: number;
+    edgeSoftnessPxAt1024: number;
+  };
   framing: {
     desktopObjectPosition: string;
     mobileObjectPosition: string;
@@ -53,6 +60,8 @@ export type ProjectedSceneArtwork = {
   visiblePhysicalBounds: { centerX: number; centerY: number; widthRatio: number; heightRatio: number };
   alphaBounds: { x: number; y: number; width: number; height: number };
   projectedAlphaQuad: SurfaceQuad;
+  projectedCanvasQuad: SurfaceQuad;
+  inverseProjection: number[];
   distortion: ProjectionDistortion;
 };
 

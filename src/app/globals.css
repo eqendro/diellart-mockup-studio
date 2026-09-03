@@ -792,6 +792,7 @@ a {
 .scene-background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: var(--scene-desktop-position); }
 .scene-surface { position: absolute; inset: 0; z-index: 1; overflow: visible; pointer-events: none; }
 .scene-artwork { position: absolute; max-width: none; height: auto; object-fit: contain; transform-origin: center; }
+.scene-print-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .scene-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-text-muted); font-size: var(--text-supporting); }
 @keyframes scene-preview-enter {
   from { opacity: .35; transform: scale(.997); }

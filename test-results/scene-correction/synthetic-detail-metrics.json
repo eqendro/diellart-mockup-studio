@@ -1,0 +1,126 @@
+[
+  {
+    "scene": "main-dish",
+    "preparedRaster": {
+      "width": 900,
+      "height": 420
+    },
+    "alphaBounds": {
+      "left": "0",
+      "top": "0",
+      "width": "900",
+      "height": "420"
+    },
+    "physicalBounds": {
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "widthRatio": 0.6504960000000001,
+      "heightRatio": 0.2293744917015177
+    },
+    "visiblePhysicalBounds": {
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "widthRatio": 0.7744000000000001,
+      "heightRatio": 0.27306487107323535
+    },
+    "printableQuadrilateral": {
+      "topLeft": {
+        "x": 0.076,
+        "y": 0.6
+      },
+      "topRight": {
+        "x": 0.319,
+        "y": 0.538
+      },
+      "bottomRight": {
+        "x": 0.336,
+        "y": 0.845
+      },
+      "bottomLeft": {
+        "x": 0.113,
+        "y": 0.92
+      }
+    },
+    "surfaceCoordinates": "safe-area",
+    "distortion": {
+      "topToBottomRatio": 1.0208266139725155,
+      "leftToRightRatio": 1.0415971138391635,
+      "aspectRatioScale": 1.4903568224682613,
+      "horizontalDivergenceDeg": 0.8137538116943404,
+      "verticalDivergenceDeg": 3.9420047033039793
+    },
+    "transformMatrix": "matrix3d(0.2229200723414459,-0.015849782629988582,0,0.000052292184835304526,0.029825497765109198,0.16989005480547198,0,0.00005316488434654595,0,0,1,0,120.72859534213298,486.743195887538,0,1)",
+    "inkPixelDiagnostics": {
+      "opaquePixels": 931,
+      "meanRgb": [
+        13.099892588614393,
+        11.066595059076262,
+        9.156820622986036
+      ],
+      "luminanceMean": 11.360988399570592,
+      "luminanceStdDev": 0.31416299044003615
+    }
+  },
+  {
+    "scene": "dessert",
+    "preparedRaster": {
+      "width": 900,
+      "height": 420
+    },
+    "alphaBounds": {
+      "left": "0",
+      "top": "0",
+      "width": "900",
+      "height": "420"
+    },
+    "physicalBounds": {
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "widthRatio": 0.6504960000000001,
+      "heightRatio": 0.2293744917015177
+    },
+    "visiblePhysicalBounds": {
+      "centerX": 0.5,
+      "centerY": 0.5,
+      "widthRatio": 0.7744000000000001,
+      "heightRatio": 0.27306487107323535
+    },
+    "printableQuadrilateral": {
+      "topLeft": {
+        "x": 0.165,
+        "y": 0.532
+      },
+      "topRight": {
+        "x": 0.357,
+        "y": 0.51
+      },
+      "bottomRight": {
+        "x": 0.499,
+        "y": 0.883
+      },
+      "bottomLeft": {
+        "x": 0.182,
+        "y": 0.988
+      }
+    },
+    "surfaceCoordinates": "paper",
+    "distortion": {
+      "topToBottomRatio": 0.8903078923173428,
+      "leftToRightRatio": 1.0252195641662716,
+      "aspectRatioScale": 1.1774238395980623,
+      "horizontalDivergenceDeg": 1.7229781074732102,
+      "verticalDivergenceDeg": 17.338013200810394
+    },
+    "transformMatrix": "matrix3d(0.19738467002480767,0.016498536947727366,0,0.00008437886147258067,-0.04122325941198936,0.009875716313570787,0,-0.00028242877286299413,0,0,1,0,216.8343412277833,436.9727815025004,0,1)",
+    "inkPixelDiagnostics": {
+      "opaquePixels": 830,
+      "meanRgb": [
+        10.453012048192772,
+        8.224096385542168,
+        6.414457831325302
+      ],
+      "luminanceMean": 8.567307951807317,
+      "luminanceStdDev": 0.48410635275540254
+    }
+  }
+]
