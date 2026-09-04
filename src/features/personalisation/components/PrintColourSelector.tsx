@@ -31,7 +31,7 @@ export function PrintColourSelector({
         compact ? "print-colour-selector-compact" : ""
       }`.trim()}
     >
-      <legend>Print colour</legend>
+      <legend className={compact ? "sr-only" : undefined}>Print colour</legend>
       <p className="print-colour-supporting">
         Select how your logo will be printed.
       </p>

@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const manrope = Manrope({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-manrope",
+  variable: "--font-inter",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
 });
 
 export const metadata: Metadata = {
@@ -19,9 +24,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={manrope.variable}>{children}</body>
+    <html lang="sq">
+      <body className={`${inter.variable} ${jetbrainsMono.variable}`}>
+        {children}
+      </body>
     </html>
   );
 }
-

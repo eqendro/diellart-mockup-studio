@@ -6,10 +6,8 @@ import { MockupRenderer } from "@/features/mockup-engine/components/MockupRender
 import {
   clampPlacement,
   calculatePlacementLimits,
-  centrePlacement,
   DEFAULT_PLACEMENT,
   resetPlacement,
-  movePlacement,
   resizePlacement,
   rotatePlacement,
   type ArtworkPlacement,
@@ -24,38 +22,34 @@ import { LogoUpload } from "@/features/upload/components/LogoUpload";
 import { useLogoUpload } from "@/features/upload/hooks/use-logo-upload";
 import { ProofToolbar } from "@/features/personalisation/components/ProofToolbar";
 import { PrintColourSelector } from "@/features/personalisation/components/PrintColourSelector";
-import { SceneGallery } from "@/features/scene-engine/components/SceneGallery";
+import { ScenePreview } from "@/features/scene-engine/components/ScenePreview";
 import { sceneText } from "@/features/scene-engine/localisation";
+import { resolveSceneSelection, sceneCatalogue } from "@/features/scene-engine/registry";
+import type { SceneId } from "@/features/scene-engine/types";
 
 export function PocketPaperPersonaliser() {
-  const labels = sceneText("en");
+  const labels = sceneText("sq");
   const upload = useLogoUpload();
   const preparation = usePreparedArtwork(upload.logo, upload.recordTrace);
   const monochrome = useMonochromeArtwork(preparation.printableArtwork);
   const [placement, setPlacement] = useState<ArtworkPlacement>(DEFAULT_PLACEMENT);
+  const [selectedScene, setSelectedScene] = useState<SceneId>("product-view");
   const [interactedArtworkUrl, setInteractedArtworkUrl] = useState<string | null>(
     null,
   );
-  const [finalProof, setFinalProof] = useState<{
-    artworkUrl: string;
-    printColour: string;
-    productId: string;
-    placement: ArtworkPlacement;
-  } | null>(null);
-  const placementLimits = preparation.printableArtwork
-    ? calculatePlacementLimits(placement.scale, {
-        mockup: pocketPaperProductView,
-        artworkAspectRatio: preparation.printableArtwork.aspectRatio,
-        rotation: placement.rotation,
-      })
-    : calculatePlacementLimits(placement.scale);
+  const activeScene = resolveSceneSelection(selectedScene, "product-view");
   const workspaceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (upload.logo) {
-      workspaceRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    if (preparation.customerState.status === "preview-ready") {
+      workspaceRef.current?.scrollIntoView({
+        block: "start",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
     }
-  }, [upload.logo]);
+  }, [preparation.customerState.status]);
 
   useEffect(() => {
     if (
@@ -112,7 +106,6 @@ export function PocketPaperPersonaliser() {
     // Artwork identity/version changes intentionally invalidate manual placement.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlacement(resetPlacement());
-    setFinalProof(null);
   }, [upload.logo, preparation.selectedArtworkUrl]);
 
   const updatePlacement = (next: ArtworkPlacement) => {
@@ -126,12 +119,69 @@ export function PocketPaperPersonaliser() {
     setPlacement(clampPlacement(next, limits));
   };
 
+  const changePrintColour = (selection: Parameters<typeof monochrome.setSelection>[0]) => {
+    monochrome.setSelection(selection);
+  };
+
+  const resizeArtwork = (direction: "increase" | "decrease") => {
+    setPlacement((current) => resizePlacement(current, direction, {
+      mockup: pocketPaperProductView,
+      artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
+    }));
+  };
+
+  const rotateArtwork = (direction: "clockwise" | "anticlockwise") => {
+    setPlacement((current) => rotatePlacement(
+      current,
+      current.rotation + (direction === "clockwise" ? 2 : -2),
+      {
+        mockup: pocketPaperProductView,
+        artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
+      },
+    ));
+  };
+
+  const selectScene = (sceneId: SceneId) => {
+    setSelectedScene(sceneId);
+    requestAnimationFrame(() => {
+      workspaceRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    });
+  };
+
   return (
     <>
       {!upload.logo ? (
-        <div className="container personaliser-upload">
-          <LogoUpload upload={upload} />
-        </div>
+        <section className="hero" aria-labelledby="hero-heading">
+          <div className="container hero-grid">
+            <div className="hero-content">
+              <p className="text-eyebrow hero-eyebrow">Nga ideja, te produkti</p>
+              <h1 id="hero-heading" className="text-display">
+                Visualizo markën
+                <span>para se ta printosh.</span>
+              </h1>
+              <p className="text-body hero-description">
+                Ngarko logon tënde dhe shikoje në produktet DiellART përpara
+                se të nisë prodhimi.
+              </p>
+              <a className="hero-cta" href="#logo-upload">
+                <span>Shijo ndjesinë</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h13m-5-5 5 5-5 5" />
+                </svg>
+              </a>
+              <p className="hero-privacy">
+                <span aria-hidden="true" /> Përpunim privat në shfletuesin tënd
+              </p>
+            </div>
+            <div className="hero-upload">
+              <div className="hero-upload-heading">
+                <p className="text-eyebrow">Studio e markës</p>
+                <p>Logoja jote nis këtu.</p>
+              </div>
+              <LogoUpload upload={upload} />
+            </div>
+          </div>
+        </section>
       ) : preparation.cropOpen ? (
         <div ref={workspaceRef} className="container crop-workspace-full">
           <ArtworkCropper
@@ -146,7 +196,8 @@ export function PocketPaperPersonaliser() {
           />
         </div>
       ) : (
-        <div ref={workspaceRef} className="container proof-workspace">
+        <section ref={workspaceRef} className="studio-section" aria-labelledby="proof-heading" data-active-scene={activeScene.id}>
+          <div className="container studio-shell">
           {preparation.croppedArtwork &&
           (preparation.customerState.status === "select-logo-area" ||
             preparation.customerState.status === "review-extraction") ? (
@@ -159,16 +210,16 @@ export function PocketPaperPersonaliser() {
             />
           ) : null}
           {!(preparation.customerState.status === "review-extraction" && preparation.extractionCandidates.length === 0) ? (
-          <section className="proof-main" aria-labelledby="proof-heading">
-            <header className="proof-heading">
+          <>
+            <header className="studio-heading">
               <div>
-                <p className="text-eyebrow">Digital proof</p>
+                <p className="text-eyebrow">Studio digjitale</p>
                 <h2 id="proof-heading" className="text-section-heading">
-                  Your Design Preview
+                  Marka jote, në produkt.
                 </h2>
-                <p className="proof-product-name">Product: Pocket Paper</p>
+                <p className="proof-product-name">Pocket Paper · Parapamje reale para prodhimit</p>
               </div>
-              <ProofToolbar upload={upload} />
+              {activeScene.category === "product" ? <ProofToolbar upload={upload} /> : null}
             </header>
             {preparation.customerState.status === "select-logo-area" &&
             !preparation.croppedArtwork ? (
@@ -190,161 +241,93 @@ export function PocketPaperPersonaliser() {
                 </button>
               </div>
             ) : null}
-            {preparation.customerState.status === "preview-ready" ? (
-              <div className="mobile-print-colour">
-                <PrintColourSelector
-                  compact
-                  detectedColour={monochrome.detectedColour}
-                  selection={monochrome.selection}
-                  onChange={(selection) => {
-                    monochrome.setSelection(selection);
-                    setFinalProof(null);
-                  }}
-                />
+            <div className="studio-viewer">
+              <div className={`studio-preview-frame ${activeScene.category === "product" ? "studio-product-frame" : "studio-lifestyle-frame"}`} aria-live="polite">
+                {activeScene.category === "product" ? (
+                  <div className="proof-stage">
+                    <MockupRenderer
+                      mockup={pocketPaperProductView}
+                      artwork={preparation.customerState.status === "preview-ready" && monochrome.status === "ready" ? monochrome.artwork : null}
+                      placement={placement}
+                      onPlacementCommit={updatePlacement}
+                      onInteractionComplete={(pointerType) => {
+                        if (pointerType === "touch") setInteractedArtworkUrl(upload.logo?.previewUrl ?? null);
+                      }}
+                    />
+                    {preparation.customerState.status === "analysing" ? (
+                      <div className="customer-status" role="status">Duke gjetur logon…</div>
+                    ) : preparation.customerState.status === "preparing" ? (
+                      <div className="customer-status" role="status">Duke përgatitur parapamjen…</div>
+                    ) : preparation.customerState.status === "preview-ready" && monochrome.status !== "ready" ? (
+                      <div className="customer-status" role="status">Duke përgatitur printimin njëngjyrësh…</div>
+                    ) : preparation.customerState.status === "error-recoverable" ? (
+                      <LogoUpload upload={upload} preparation={preparation} recoveryOnly />
+                    ) : preparation.customerState.status === "preview-ready" && !preparation.printableArtwork ? (
+                      <div className="customer-status" role="status">Zgjidh zonën e logos për të vazhduar.</div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <ScenePreview
+                    key={activeScene.id}
+                    scene={activeScene}
+                    artwork={preparation.customerState.status === "preview-ready" && monochrome.status === "ready" ? monochrome.artwork : null}
+                    placement={placement}
+                  />
+                )}
               </div>
-            ) : null}
-            <div className="proof-stage">
-              <MockupRenderer
-                mockup={pocketPaperProductView}
-                artwork={
-                  preparation.customerState.status === "preview-ready" &&
-                  monochrome.status === "ready"
-                    ? monochrome.artwork
-                    : null
-                }
-                placement={placement}
-                onPlacementCommit={updatePlacement}
-                onInteractionComplete={(pointerType) => {
-                  if (pointerType === "touch") {
-                    setInteractedArtworkUrl(upload.logo?.previewUrl ?? null);
-                  }
-                }}
-              />
-              {preparation.customerState.status === "analysing" ? (
-                <div className="customer-status" role="status">Finding your logo…</div>
-              ) : preparation.customerState.status === "preparing" ? (
-                <div className="customer-status" role="status">Preparing your preview…</div>
-              ) : preparation.customerState.status === "preview-ready" &&
-                monochrome.status !== "ready" ? (
-                <div className="customer-status" role="status">
-                  Preparing one-colour artwork…
+              <aside className="studio-rail">
+                <div className="studio-scenes-group">
+                  <p className="studio-rail-label">Pamjet</p>
+                  <nav className="studio-scene-selector" aria-label={labels.lifestylePreviews}>
+                    {sceneCatalogue.map((scene) => (
+                      <button
+                        key={scene.id}
+                        type="button"
+                        className="studio-scene-option"
+                        aria-pressed={activeScene.id === scene.id}
+                        onClick={() => selectScene(scene.id)}
+                      >
+                        <span>{labels[scene.labelKey]}</span>
+                        <span className="studio-scene-dot" aria-hidden="true" />
+                      </button>
+                    ))}
+                  </nav>
                 </div>
-              ) : preparation.customerState.status === "error-recoverable" ? (
-                <LogoUpload
-                  upload={upload}
-                  preparation={preparation}
-                  recoveryOnly
-                />
-              ) : preparation.customerState.status === "preview-ready" &&
-                !preparation.printableArtwork ? (
-                <div className="customer-status" role="status">
-                  Select the logo area to continue.
-                </div>
-              ) : null}
+                {preparation.customerState.status === "preview-ready" ? (
+                  <div className={`studio-controls ${activeScene.category === "lifestyle" ? "studio-controls-lifestyle" : ""}`} aria-label="Kontrollet e dizajnit">
+                    <p className="studio-rail-label">Ngjyra e printimit</p>
+                    <PrintColourSelector compact detectedColour={monochrome.detectedColour} selection={monochrome.selection} onChange={changePrintColour} />
+                    {activeScene.category === "product" ? (
+                      <>
+                        <fieldset className="studio-compact-control">
+                          <legend>Madhësia</legend>
+                          <button type="button" className="precision-button" aria-label="Make artwork smaller" onClick={() => resizeArtwork("decrease")}>−</button>
+                          <button type="button" className="precision-button" aria-label="Make artwork larger" onClick={() => resizeArtwork("increase")}>+</button>
+                        </fieldset>
+                        <fieldset className="studio-compact-control">
+                          <legend>Rrotullimi</legend>
+                          <button type="button" className="precision-button" aria-label="Rotate artwork anticlockwise" onClick={() => rotateArtwork("anticlockwise")}>↶</button>
+                          <button type="button" className="precision-button" aria-label="Rotate artwork clockwise" onClick={() => rotateArtwork("clockwise")}>↷</button>
+                        </fieldset>
+                        <button type="button" className="button button-ghost button-medium studio-reset" onClick={() => setPlacement(resetPlacement())}>Rivendos</button>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+                <a className="studio-contact-cta" href="#contact"><span>Na kontakto</span><span aria-hidden="true">→</span></a>
+              </aside>
             </div>
-            {preparation.customerState.status === "preview-ready" &&
-            interactedArtworkUrl !== upload.logo?.previewUrl ? (
-              <p className="gesture-instruction">
-                Drag to move <span aria-hidden="true">·</span> Pinch to resize
-              </p>
+            {activeScene.category === "product" && preparation.customerState.status === "preview-ready" && interactedArtworkUrl !== upload.logo?.previewUrl ? (
+              <p className="gesture-instruction">Tërhiq për ta lëvizur <span aria-hidden="true">·</span> afro gishtat për madhësi</p>
             ) : null}
-            <p className="proof-disclaimer">
-              This digital proof shows the selected one-colour print appearance.
-              Final production artwork will be professionally prepared before printing.
-            </p>
-          </section>
-          ) : null}
-          {preparation.customerState.status === "preview-ready" ? (
-          <aside
-            className="proof-sidebar"
-            aria-label="Artwork controls"
-            data-approved-print-colour={finalProof?.printColour}
-            data-approved-product={finalProof?.productId}
-          >
-            <div className="desktop-print-colour">
-              <PrintColourSelector
-                detectedColour={monochrome.detectedColour}
-                selection={monochrome.selection}
-                onChange={(selection) => {
-                  monochrome.setSelection(selection);
-                  setFinalProof(null);
-                }}
-              />
+            <div className="studio-footer-row">
+              <p className="proof-disclaimer">Parapamja tregon printimin e zgjedhur njëngjyrësh. Materiali final përgatitet profesionalisht para prodhimit.</p>
             </div>
-            <LogoUpload
-              upload={upload}
-              preparation={preparation}
-              simplified
-              hideAssetActions
-              approved={Boolean(finalProof)}
-              placement={placement}
-              placementLimits={placementLimits}
-              onPlacementChange={updatePlacement}
-              onMovePlacement={(direction) =>
-                setPlacement((current) => {
-                  const limits = calculatePlacementLimits(current.scale, {
-                    mockup: pocketPaperProductView,
-                    artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
-                    rotation: current.rotation,
-                  });
-                  return movePlacement(current, direction, limits);
-                })
-              }
-              onResizePlacement={(direction) =>
-                setPlacement((current) => resizePlacement(current, direction, {
-                  mockup: pocketPaperProductView,
-                  artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
-                }))
-              }
-              onRotatePlacement={(direction) =>
-                setPlacement((current) => rotatePlacement(
-                  current,
-                  current.rotation + (direction === "clockwise" ? 2 : -2),
-                  {
-                    mockup: pocketPaperProductView,
-                    artworkAspectRatio: preparation.printableArtwork?.aspectRatio ?? 1,
-                  },
-                ))
-              }
-              onCentrePlacement={() =>
-                setPlacement((current) => centrePlacement(current))
-              }
-              onResetPlacement={() => setPlacement(resetPlacement())}
-              onArtworkVersionChange={(showOriginal) => {
-                preparation.setShowOriginal(showOriginal);
-                setPlacement(resetPlacement());
-              }}
-              onApprove={() => {
-                if (monochrome.artwork) {
-                  setFinalProof({
-                    artworkUrl: monochrome.artwork.url,
-                    printColour: monochrome.selectedColour,
-                    productId: pocketPaperProductView.id,
-                    placement: { ...placement },
-                  });
-                }
-              }}
-              onEditPlacement={() => setFinalProof(null)}
-            />
-          </aside>
+          </>
           ) : null}
-        </div>
+          </div>
+        </section>
       )}
-      {!preparation.cropOpen ? <div className="container lifestyle-section">
-        <header className="section-header">
-          <p className="text-eyebrow">{labels.lifestylePreviews}</p>
-          <h2 id="preview-heading" className="text-section-heading">
-            {labels.lifestyleHeading}
-          </h2>
-          <p className="text-body">
-            {labels.lifestyleDescription}
-          </p>
-        </header>
-        <SceneGallery
-          artwork={preparation.customerState.status === "preview-ready" && monochrome.status === "ready" ? monochrome.artwork : null}
-          placement={placement}
-        />
-      </div> : null}
     </>
   );
 }

@@ -359,7 +359,7 @@ export function LogoUpload({
   };
 
   return (
-    <Card id="logo-upload" padding="none" className="logo-upload">
+    <Card id="logo-upload" tabIndex={-1} padding="none" className="logo-upload">
       <input
         id={galleryInputId}
         ref={inputRef}
@@ -614,18 +614,21 @@ export function LogoUpload({
           </div>
           <div>
             <p className="text-eyebrow">
-              {status === "drag-active" ? "Drop your file here" : "Browser-local preview"}
+              {status === "drag-active" ? "Lësho skedarin këtu" : "Hapi i parë"}
             </p>
             <h2 id="logo-upload-heading" className="text-section-heading upload-heading">
               {status === "reading"
                 ? "Reading your image…"
                 : isValidating
                   ? "Checking your logo…"
-                  : "Upload your logo"}
+                  : "Ngarko logon tënde"}
             </h2>
             <p id="upload-instructions" className="text-supporting">
-              Drag and drop one file here, or browse. PNG, JPG, JPEG, WebP or SVG,
-              up to {MAX_LOGO_FILE_SIZE_LABEL}.
+              <span className="upload-instructions-desktop">
+                Tërhiqe këtu ose zgjidhe nga pajisja. PNG, JPG, JPEG, WebP ose SVG,
+                deri në {MAX_LOGO_FILE_SIZE_LABEL}.
+              </span>
+              <span className="upload-instructions-mobile">PNG · JPG · SVG · WebP</span>
             </p>
           </div>
           <div className="upload-choice-actions">
@@ -638,7 +641,7 @@ export function LogoUpload({
               aria-disabled={isValidating}
               onClick={() => void openStoredFilePicker()}
             >
-              {status === "reading" ? "Reading your image…" : isValidating ? "Checking" : "Choose logo file"}
+              {status === "reading" ? "Duke lexuar imazhin…" : isValidating ? "Duke kontrolluar" : "Zgjidh logon"}
             </button>
             <p className="stored-file-upload-help">Select the original image from Files, Downloads or your saved folders.</p>
             <button
@@ -646,7 +649,7 @@ export function LogoUpload({
               className="button button-ghost button-medium camera-upload-action"
               onClick={() => openCameraPicker()}
             >
-              Take a photo
+              Bëj një foto
             </button>
           </div>
         </div>

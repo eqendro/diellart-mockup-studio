@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Container } from "@/components/ui/Container";
 
 export function Header() {
@@ -9,12 +10,21 @@ export function Header() {
           aria-label="DiellArt Mockup Studio home"
           className="brand"
         >
-          <span className="brand-name">DiellArt</span>
+          <Image
+            src="/brand/diellart-logo.png"
+            alt="DiellART"
+            width={3000}
+            height={2674}
+            className="brand-logo"
+            priority
+          />
           <span className="brand-product">
             Mockup Studio
           </span>
         </a>
-        <span className="text-label header-label">Preview experience</span>
+        <a className="text-label header-label" href="#logo-upload">
+          Studio digjitale
+        </a>
       </Container>
     </header>
   );
