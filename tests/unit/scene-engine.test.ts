@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrintableArtwork } from "../../src/features/logo-engine/types/artwork";
+import { resolveSceneBackingStore, resolveSceneRenderDpr } from "../../src/features/scene-engine/rendering-quality";
 import {
   createSceneArtworkProjection,
   createSceneRegistry,
@@ -24,6 +25,16 @@ const artwork: PrintableArtwork = {
   foregroundBounds: { x: 0, y: 0, width: 200, height: 100 },
 };
 const placement = { scale: 0.8, offsetX: 0.1, offsetY: -0.2, rotation: 14 };
+
+describe("scene canvas density", () => {
+  it("matches backing-store pixels to a capped device pixel ratio", () => {
+    expect(resolveSceneBackingStore(390, 260, 1)).toEqual({ effectiveDpr: 1, width: 390, height: 260 });
+    expect(resolveSceneBackingStore(390, 260, 2)).toEqual({ effectiveDpr: 2, width: 780, height: 520 });
+    expect(resolveSceneBackingStore(390, 260, 3)).toEqual({ effectiveDpr: 3, width: 1170, height: 780 });
+    expect(resolveSceneBackingStore(390, 260, 4)).toEqual({ effectiveDpr: 3, width: 1170, height: 780 });
+    expect(resolveSceneRenderDpr(undefined)).toBe(1);
+  });
+});
 
 describe("scene registry", () => {
   it("registers the three initial data-driven scenes", () => {

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { PrintableArtwork } from "@/features/logo-engine/types/artwork";
 import { projectPoint } from "@/features/scene-engine/geometry";
+import { resolveSceneBackingStore } from "@/features/scene-engine/rendering-quality";
 import type { ProjectedSceneArtwork, SceneDefinition } from "@/features/scene-engine/types";
 
 type Props = { scene: SceneDefinition; artwork: PrintableArtwork; mapped: ProjectedSceneArtwork; width: number; height: number };
@@ -26,31 +27,41 @@ export function ScenePrintCanvas({ scene, artwork, mapped, width, height }: Prop
     let cancelled = false;
     Promise.all([loadImage(scene.asset.path), loadImage(artwork.url)]).then(([paper, ink]) => {
       if (cancelled) return;
-      const outputWidth = Math.max(1, Math.round(width));
-      const outputHeight = Math.max(1, Math.round(height));
+      const backingStore = resolveSceneBackingStore(width, height, window.devicePixelRatio);
+      const { width: outputWidth, height: outputHeight, effectiveDpr } = backingStore;
       canvas.width = outputWidth;
       canvas.height = outputHeight;
+      canvas.dataset.effectiveDpr = String(effectiveDpr);
+      canvas.dataset.cssWidth = String(width);
+      canvas.dataset.cssHeight = String(height);
       const paperCanvas = document.createElement("canvas");
       paperCanvas.width = outputWidth;
       paperCanvas.height = outputHeight;
       const paperContext = paperCanvas.getContext("2d", { willReadFrequently: true })!;
+      paperContext.imageSmoothingEnabled = true;
+      paperContext.imageSmoothingQuality = "high";
       paperContext.drawImage(paper, 0, 0, outputWidth, outputHeight);
       const paperPixels = paperContext.getImageData(0, 0, outputWidth, outputHeight);
       const inkCanvas = document.createElement("canvas");
       inkCanvas.width = artwork.canvasWidth;
       inkCanvas.height = artwork.canvasHeight;
       const inkContext = inkCanvas.getContext("2d", { willReadFrequently: true })!;
+      inkContext.imageSmoothingEnabled = true;
+      inkContext.imageSmoothingQuality = "high";
       inkContext.drawImage(ink, 0, 0, artwork.canvasWidth, artwork.canvasHeight);
       const inkPixels = inkContext.getImageData(0, 0, artwork.canvasWidth, artwork.canvasHeight);
       const output = new ImageData(outputWidth, outputHeight);
       const quad = mapped.projectedCanvasQuad;
-      const minX = Math.max(0, Math.floor(Math.min(quad.topLeft.x, quad.topRight.x, quad.bottomRight.x, quad.bottomLeft.x)));
-      const maxX = Math.min(outputWidth - 1, Math.ceil(Math.max(quad.topLeft.x, quad.topRight.x, quad.bottomRight.x, quad.bottomLeft.x)));
-      const minY = Math.max(0, Math.floor(Math.min(quad.topLeft.y, quad.topRight.y, quad.bottomRight.y, quad.bottomLeft.y)));
-      const maxY = Math.min(outputHeight - 1, Math.ceil(Math.max(quad.topLeft.y, quad.topRight.y, quad.bottomRight.y, quad.bottomLeft.y)));
+      const minX = Math.max(0, Math.floor(Math.min(quad.topLeft.x, quad.topRight.x, quad.bottomRight.x, quad.bottomLeft.x) * effectiveDpr));
+      const maxX = Math.min(outputWidth - 1, Math.ceil(Math.max(quad.topLeft.x, quad.topRight.x, quad.bottomRight.x, quad.bottomLeft.x) * effectiveDpr));
+      const minY = Math.max(0, Math.floor(Math.min(quad.topLeft.y, quad.topRight.y, quad.bottomRight.y, quad.bottomLeft.y) * effectiveDpr));
+      const maxY = Math.min(outputHeight - 1, Math.ceil(Math.max(quad.topLeft.y, quad.topRight.y, quad.bottomRight.y, quad.bottomLeft.y) * effectiveDpr));
       const substrateShare = scene.printMaterial.textureInfluence * 0.65;
       for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
-        const source = projectPoint(mapped.inverseProjection as Parameters<typeof projectPoint>[0], { x: x + 0.5, y: y + 0.5 });
+        const source = projectPoint(mapped.inverseProjection as Parameters<typeof projectPoint>[0], {
+          x: (x + 0.5) / effectiveDpr,
+          y: (y + 0.5) / effectiveDpr,
+        });
         const sx = Math.floor(source.x - 0.5);
         const sy = Math.floor(source.y - 0.5);
         if (sx < 0 || sy < 0 || sx + 1 >= artwork.canvasWidth || sy + 1 >= artwork.canvasHeight) continue;

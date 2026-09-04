@@ -1,0 +1,170 @@
+[
+  {
+    "scene": "main-dish",
+    "devicePixelRatio": 1,
+    "effectiveDpr": 1,
+    "cssCanvas": {
+      "width": 350,
+      "height": 233.328125
+    },
+    "backingStore": {
+      "width": 349,
+      "height": 233
+    },
+    "preparedArtwork": {
+      "width": 3000,
+      "height": 2674
+    },
+    "alphaBounds": {
+      "x": "0",
+      "y": "0",
+      "width": "3000",
+      "height": "2674"
+    },
+    "background": {
+      "path": "/scenes/pocket-paper/final/main-dish-steak.jpg",
+      "naturalWidth": 1536,
+      "naturalHeight": 1024
+    }
+  },
+  {
+    "scene": "dessert",
+    "devicePixelRatio": 1,
+    "effectiveDpr": 1,
+    "cssCanvas": {
+      "width": 350,
+      "height": 233.328125
+    },
+    "backingStore": {
+      "width": 349,
+      "height": 233
+    },
+    "preparedArtwork": {
+      "width": 3000,
+      "height": 2674
+    },
+    "alphaBounds": {
+      "x": "0",
+      "y": "0",
+      "width": "3000",
+      "height": "2674"
+    },
+    "background": {
+      "path": "/scenes/pocket-paper/final/dessert-coffee.jpg",
+      "naturalWidth": 1536,
+      "naturalHeight": 1024
+    }
+  },
+  {
+    "scene": "main-dish",
+    "devicePixelRatio": 2,
+    "effectiveDpr": 2,
+    "cssCanvas": {
+      "width": 350,
+      "height": 233.328125
+    },
+    "backingStore": {
+      "width": 698,
+      "height": 465
+    },
+    "preparedArtwork": {
+      "width": 3000,
+      "height": 2674
+    },
+    "alphaBounds": {
+      "x": "0",
+      "y": "0",
+      "width": "3000",
+      "height": "2674"
+    },
+    "background": {
+      "path": "/scenes/pocket-paper/final/main-dish-steak.jpg",
+      "naturalWidth": 1536,
+      "naturalHeight": 1024
+    }
+  },
+  {
+    "scene": "dessert",
+    "devicePixelRatio": 2,
+    "effectiveDpr": 2,
+    "cssCanvas": {
+      "width": 350,
+      "height": 233.328125
+    },
+    "backingStore": {
+      "width": 698,
+      "height": 465
+    },
+    "preparedArtwork": {
+      "width": 3000,
+      "height": 2674
+    },
+    "alphaBounds": {
+      "x": "0",
+      "y": "0",
+      "width": "3000",
+      "height": "2674"
+    },
+    "background": {
+      "path": "/scenes/pocket-paper/final/dessert-coffee.jpg",
+      "naturalWidth": 1536,
+      "naturalHeight": 1024
+    }
+  },
+  {
+    "scene": "main-dish",
+    "devicePixelRatio": 3,
+    "effectiveDpr": 3,
+    "cssCanvas": {
+      "width": 350,
+      "height": 233.328125
+    },
+    "backingStore": {
+      "width": 1047,
+      "height": 698
+    },
+    "preparedArtwork": {
+      "width": 3000,
+      "height": 2674
+    },
+    "alphaBounds": {
+      "x": "0",
+      "y": "0",
+      "width": "3000",
+      "height": "2674"
+    },
+    "background": {
+      "path": "/scenes/pocket-paper/final/main-dish-steak.jpg",
+      "naturalWidth": 1536,
+      "naturalHeight": 1024
+    }
+  },
+  {
+    "scene": "dessert",
+    "devicePixelRatio": 3,
+    "effectiveDpr": 3,
+    "cssCanvas": {
+      "width": 350,
+      "height": 233.328125
+    },
+    "backingStore": {
+      "width": 1047,
+      "height": 698
+    },
+    "preparedArtwork": {
+      "width": 3000,
+      "height": 2674
+    },
+    "alphaBounds": {
+      "x": "0",
+      "y": "0",
+      "width": "3000",
+      "height": "2674"
+    },
+    "background": {
+      "path": "/scenes/pocket-paper/final/dessert-coffee.jpg",
+      "naturalWidth": 1536,
+      "naturalHeight": 1024
+    }
+  }
+]
